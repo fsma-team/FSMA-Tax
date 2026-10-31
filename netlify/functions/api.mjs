@@ -550,17 +550,16 @@ async function listLog() {
 // ---------- backup (Admin) ----------
 async function backup() {
   const sql = db();
-  const [tabs, users, rows, log, settings, blackouts, bookings, sched, fees] = await Promise.all([
-    sql`select * from staff_tabs order by id`,
-    sql`select id, username, full_name, display_name, role, tab_id, active, must_change, appt_font, created_at, last_login_at from users order by id`,
-    sql`select * from rows order by tab_id, pos`,
-    sql`select * from activity_log order by id`,
-    getSettings(sql),
-    sql`select * from blackouts order by day`,
-    sql`select * from bookings order by day, slot`,
-    getSched(sql),
-    getFees(sql),
-  ]);
+  // run one query at a time: Supabase transaction pooler (6543) can hang on parallel/pipelined queries
+  const tabs = await sql`select * from staff_tabs order by id`;
+  const users = await sql`select id, username, full_name, display_name, role, tab_id, active, must_change, appt_font, created_at, last_login_at from users order by id`;
+  const rows = await sql`select * from rows order by tab_id, pos`;
+  const log = await sql`select * from activity_log order by id`;
+  const settings = await getSettings(sql);
+  const blackouts = await sql`select * from blackouts order by day`;
+  const bookings = await sql`select * from bookings order by day, slot`;
+  const sched = await getSched(sql);
+  const fees = await getFees(sql);
   const body = JSON.stringify({ exported_at: new Date().toISOString(), staff_tabs: tabs, users, rows, activity_log: log, settings, blackouts, bookings, schedule: sched, fees: fees.fees, fee_tiers: fees.tiers });
   return new Response(body, { status: 200, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'content-disposition': `attachment; filename="tax-backup-${todayLA()}.json"` } });
 }
@@ -575,15 +574,14 @@ async function putPrefs(user, body) {
 // ---------- boot ----------
 async function boot(user) {
   const sql = db();
-  const [tabs, settings, blackouts, sched, fees, rowsRes, users] = await Promise.all([
-    sql`select * from staff_tabs where deleted_at is null order by sort, id`,
-    getSettings(sql),
-    sql`select * from blackouts order by day`,
-    getSched(sql),
-    getFees(sql),
-    listRows(new URL('http://x/rows')),
-    user.role === 'admin' ? listUsers() : Promise.resolve([]),
-  ]);
+  // one query at a time (see backup)
+  const tabs = await sql`select * from staff_tabs where deleted_at is null order by sort, id`;
+  const settings = await getSettings(sql);
+  const blackouts = await sql`select * from blackouts order by day`;
+  const sched = await getSched(sql);
+  const fees = await getFees(sql);
+  const rowsRes = await listRows(new URL('http://x/rows'));
+  const users = user.role === 'admin' ? await listUsers() : [];
   return {
     me: meOut(user),
     tabs: tabs.map(tabOut),
