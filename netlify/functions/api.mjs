@@ -209,9 +209,12 @@ async function deleteRow(user, id) {
     if (!old || old.deleted_at) throw new HttpError(404, 'Row not found');
     if (!canEditTab(user, old.tab_id)) throw new HttpError(403, 'You can only edit your own tab');
     await t`update rows set deleted_at=now(), updated_at=now(), updated_by=${user.display_name} where id=${id}`;
-    const snap = rowOut(old);
-    await t`insert into activity_log (user_name, tab_name, kind, text, row_id, snapshot) values (${user.display_name}, ${old.tab_name}, 'delete',
-      ${`${snap.name || '(trống)'} · ${snap.status || '—'} · ${money(snap.amt)} · ${snap.date ? mdy(snap.date) : ''}`}, ${id}, ${t.json(snap)})`;
+    // only files already Accepted are logged (Admin can restore them); others are simply removed
+    if (old.status === 'Accepted') {
+      const snap = rowOut(old);
+      await t`insert into activity_log (user_name, tab_name, kind, text, row_id, snapshot) values (${user.display_name}, ${old.tab_name}, 'delete',
+        ${`${snap.name || '(trống)'} · ${snap.status || '—'} · ${money(snap.amt)} · ${snap.date ? mdy(snap.date) : ''}`}, ${id}, ${t.json(snap)})`;
+    }
     return { ok: true };
   });
 }

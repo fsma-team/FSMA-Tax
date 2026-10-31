@@ -117,7 +117,7 @@ function loadBoot(){
     S.retire=st.retirement||[["IRA","—"],["IRA 50+","—"],["401k / 403b / 457","—"],["Catch-up 50+","—"],["SIMPLE","—"]];S.emailFormats=st.email_formats||{};
     S.blackouts=b.blackouts.map(function(x){return {id:x.id,date:x.date,who:x.who,note:x.note}});
     S.sched=b.sched;S.fees=b.fees;S.feeTiers=b.tiers.map(function(t){return [t[0],t[1],tierRows(t)]});S.now=b.now;buildRows(b.rows);
-    S.bookings={};S.bkWeek=null;S.logLoaded=false;S.rec=null;
+    S.bookings={};S.bkWeeks={};S.logLoaded=false;S.rec=null;
     if(!S.pYear){S.pYear=S.fy;applyPeriod()}
     if(sById(S.page)===undefined&&["home","fees","appt","attn","reports","acct","records","settings","search"].indexOf(S.page)<0)S.page="home";
     buildShell();render();startPolling();
@@ -151,10 +151,12 @@ function startPolling(){
       S.now=d.now;var list=d.rows.filter(function(o){return o.id!==skip});
       var changed=list.some(function(o){var loc=S.idx[o.id];if(o.deleted)return !!loc;var r=loc&&S.rows[loc[0]][loc[1]];return !r||JSON.stringify(mapRow(o))!==JSON.stringify(Object.assign({},r,{_q:undefined}))});
       if(changed){applyChanges(list);if(!uiBusy()&&S.page!=="appt")renderKeep()}
-      if(S.page==="appt"&&S.apptSub!=="Work Schedule")refreshWeek();
     }).catch(function(){});
   },30000);
+  setInterval(function(){if(S.me&&!document.hidden&&Date.now()-S.lastAct<30*60*1000&&S.page==="appt"&&S.apptSub!=="Work Schedule")refreshWeek()},APPT_POLL);
+  document.addEventListener("visibilitychange",function(){if(!document.hidden&&S.me&&S.page==="appt"&&S.apptSub!=="Work Schedule")refreshWeek()});
 }
+var APPT_POLL=10000;
 
 /* ================= nav ================= */
 function renderNav(){
@@ -466,7 +468,7 @@ function pageFees(){
 
 /* ================= Staff tab ================= */
 function onlineInner(r,dis){var d=dis?' disabled':'';return '<div class="onl"><label><input type="checkbox" data-f="online"'+(r.online?' checked':'')+d+' style="width:auto"> Online</label>'+(r.online?'<div class="sub"><label><input type="checkbox" data-f="esign"'+(r.esign?' checked':'')+d+' style="width:auto"> E-sign</label><label><input type="checkbox" data-f="paid"'+(r.paid?' checked':'')+d+' style="width:auto"> Paid'+(r.paid&&r.paidDate?' <span class="muted">'+md(r.paidDate)+'</span>':'')+'</label></div>':'')+'</div>'}
-function actInner(i,r,can){if(!can||isBlank(r))return '';return (r.status==="Accepted"?'<span class="lock" title="Đã Accepted: mọi thay đổi được ghi log cho Admin">🔒</span> ':'')+'<button class="btn sm del" data-del="'+i+'" title="Xóa dòng (có ghi log)">×</button>'}
+function actInner(i,r,can){if(!can||isBlank(r))return '';return (r.status==="Accepted"?'<span class="lock" title="Đã Accepted: mọi thay đổi được ghi log cho Admin">🔒</span> ':'')+'<button class="btn sm del" data-del="'+i+'" title="'+(r.status==="Accepted"?'Xóa dòng (có ghi log)':'Xóa dòng')+'">×</button>'}
 function decorate(id){
   var rows=S.rows[id],trs=$$("table.sheet tr[data-i]"),prev=null,grp=0,sums={};
   trs.forEach(function(tr){var r=rows[+tr.getAttribute("data-i")];if(r.date)sums[r.date]=(sums[r.date]||0)+amt(r)});
@@ -502,7 +504,7 @@ function pageStaff(id){
   });
   h+='</table></div>';
   if(can)h+='<p style="margin-top:14px"><button class="btn" id="addRows">+ 50 dòng</button> <span class="muted small">Gõ thẳng vào dòng trống, hết dòng thì bấm thêm</span></p>';
-  h+='<div class="legend">Date gõ mmddyy (021527 = 02/15/27, gõ 4 số 0215 = năm nay) · Dòng trống tự nhận ngày của dòng trên khi bạn gõ · Method mặc định Cash · tick Online để hiện E-sign và Paid · Online mà chưa Paid → tính vào Still waiting for Online files · SSN chỉ nhập 4 số cuối · 🔒 Accepted: mọi thay đổi và mọi lần xóa đều được ghi log cho Admin</div></div>';
+  h+='<div class="legend">Date gõ mmddyy (021527 = 02/15/27, gõ 4 số 0215 = năm nay) · Dòng trống tự nhận ngày của dòng trên khi bạn gõ · Method mặc định Cash · tick Online để hiện E-sign và Paid · Online mà chưa Paid → tính vào Still waiting for Online files · SSN chỉ nhập 4 số cuối · 🔒 Accepted: mọi thay đổi và mọi lần xóa sau khi Accepted đều được ghi log cho Admin · hồ sơ chưa Accepted xóa luôn, không hỏi</div></div>';
   return h;
 }
 var FIELD_LABEL={date:"Date",status:"Status",name:"Name",ssn:"SSN",amt:"Tiền",method:"Method",online:"Online",esign:"E-sign",paid:"Paid",note:"Notes",tip:"Tips"};
@@ -533,7 +535,7 @@ function bindStaff(id){
   };
   tbl.onclick=function(e){var b=e.target.closest("[data-del]");if(!b)return;
     var i=+b.getAttribute("data-del"),r=rows[i];
-    if(!confirm("Xóa hồ sơ “"+(r.name||"(trống)")+"”? Việc xóa sẽ được ghi log cho Admin (Admin có thể khôi phục)."))return;
+    if(r.status==="Accepted"&&!confirm("Hồ sơ “"+(r.name||"(trống)")+"” đã Accepted. Xóa? Việc xóa sẽ được ghi log cho Admin (Admin có thể khôi phục)."))return;
     (r._q||Promise.resolve()).then(function(){return r.id?api("DELETE","/rows/"+r.id):null}).then(function(){if(r.id)delete S.idx[r.id];rows[i]=blank(i);render()}).catch(fail)};
   var ar=$("#addRows");if(ar)ar.onclick=function(){api("POST","/tabs/"+t.dbId+"/extend").then(function(d){t.sheetLen=d.sheet_len;while(rows.length<t.sheetLen)rows.push(blank(rows.length));render()}).catch(fail)};
   if($("#cust"))$("#cust").onclick=function(){openCustomize(id)};
@@ -558,15 +560,17 @@ function coverMap(who,d,except){var slots=slotsFor(who),cov={};Object.keys(S.boo
 function canPlace(who,d,time,span,except){if(colInfo(who,d))return "Ngày đó đang nghỉ.";var slots=slotsFor(who),si=slots.indexOf(toMin(time));if(si<0)return "Giờ đó không có trong lịch.";if(si+span>slots.length)return "Không đủ chỗ ở khung giờ đó.";var cov=coverMap(who,d,except);for(var i=si;i<si+span;i++)if(cov[i])return "Không đủ chỗ ở khung giờ đó.";return ""}
 function renderKeep(){var y=window.scrollY,x=window.scrollX,w=$(".week")&&$(".week").parentNode,wl=w?w.scrollLeft:0;render();window.scrollTo(x,y);var w2=$(".week")&&$(".week").parentNode;if(w2)w2.scrollLeft=wl}
 function bkSnap(wk){var o={};Object.keys(S.bookings).forEach(function(k){var d=k.split("|")[1];if(d>=wk&&d<=addDays(wk,6))o[k]=S.bookings[k]});return JSON.stringify(o)}
-var _wkReq=0;
-function refreshWeek(){var wk=S.weekStart,me=++_wkReq;
-  return api("GET","/bookings?from="+wk+"&to="+addDays(wk,6)).then(function(list){if(me!==_wkReq)return;
+var _wkReq={};S.bkWeeks={};
+function refreshWeek(wk){wk=wk||S.weekStart;var me=_wkReq[wk]=(_wkReq[wk]||0)+1;
+  return api("GET","/bookings?from="+wk+"&to="+addDays(wk,6)).then(function(list){if(me!==_wkReq[wk])return;var first=!S.bkWeeks[wk];S.bkWeeks[wk]=true;
     var before=bkSnap(wk);
     Object.keys(S.bookings).forEach(function(k){var d=k.split("|")[1];if(d>=wk&&d<=addDays(wk,6))delete S.bookings[k]});
     list.forEach(function(b){S.bookings[b.cal+"|"+b.date+"|"+b.slot]={n:b.n,p:b.p,f:b.f,s:b.s,note:b.note,span:b.span,id:b.id}});
-    S.bkWeek=wk;
-    if(bkSnap(wk)!==before&&S.page==="appt"&&S.apptSub!=="Work Schedule"&&S.weekStart===wk&&!uiBusy()&&!S._dk)renderKeep();
+    if((first||bkSnap(wk)!==before)&&S.page==="appt"&&S.apptSub!=="Work Schedule"&&S.weekStart===wk&&!uiBusy()&&!S._dk)renderKeep();
   }).catch(function(){})}
+/* load this week, then the weeks around it so ‹ › open instantly */
+function ensureWeeks(){var wk=S.weekStart;
+  (S.bkWeeks[wk]?Promise.resolve():refreshWeek(wk)).then(function(){[addDays(wk,7),addDays(wk,-7)].forEach(function(w){if(!S.bkWeeks[w])refreshWeek(w)})})}
 function reloadWeek(){return refreshWeek()}
 /* optimistic: show the change now, save in the background, re-sync on error */
 function localMove(ok,nk,nb){if(ok&&ok!==nk)delete S.bookings[ok];S.bookings[nk]=nb;renderKeep()}
@@ -582,7 +586,7 @@ function moveBooking(ok,nk){
 }
 function bindAppt(){
   $$("[data-sub]").forEach(function(b){b.onclick=function(){S.apptSub=b.getAttribute("data-sub");render()}});
-  if($("#pw")){$("#pw").onclick=function(){S.weekStart=addDays(S.weekStart,-7);render()};$("#nw").onclick=function(){S.weekStart=addDays(S.weekStart,7);render()}}
+  if($("#pw")){$("#pw").onclick=function(){S.weekStart=addDays(S.weekStart,-7);render();refreshWeek()};$("#nw").onclick=function(){S.weekStart=addDays(S.weekStart,7);render();refreshWeek()}}
   if($("#apFont"))$("#apFont").onchange=function(){var v=this.value;api("PUT","/prefs",{appt_font:v}).then(function(){S.me.appt_font=v;render()}).catch(fail)};
   var clr=function(){$$("td.pre").forEach(function(x){x.classList.remove("pre")})};
   $$("td.c").forEach(function(td){
@@ -593,6 +597,12 @@ function bindAppt(){
   $$("td.bk").forEach(function(td){td.draggable=true;
     td.ondragstart=function(e){S._dk=td.getAttribute("data-k");e.dataTransfer.setData("text/plain",S._dk);e.dataTransfer.effectAllowed="move"};
     td.ondragend=function(){S._dk=null;clr()}});
+  $$("[data-bx]").forEach(function(x){
+    x.onmousedown=function(e){e.stopPropagation()};
+    x.onclick=function(e){e.stopPropagation();e.preventDefault();var k=x.getAttribute("data-bx"),p=k.split("|"),bk=S.bookings[k];if(!bk)return;
+      if(!confirm("Xóa hẹn "+bk.n+" ("+p[0]+" · "+mdy(p[1])+" · "+p[2]+")?"))return;
+      delete S.bookings[k];renderKeep();
+      api("DELETE","/bookings?cal="+p[0]+"&day="+p[1]+"&slot="+p[2]).then(reloadWeek).catch(function(er){fail(er);reloadWeek()})}});
   $$(".rz").forEach(function(z){
     z.onclick=function(e){e.stopPropagation()};
     z.onpointerdown=function(e){e.stopPropagation();e.preventDefault();
@@ -661,7 +671,7 @@ function pageAppt(){
   var who=S.apptSub,names=["Thứ 2","Thứ 3","Thứ 4","Thứ 5","Thứ 6","Thứ 7","CN"],days=[];for(var i=0;i<7;i++)days.push(addDays(S.weekStart,i));
   var h='<div class="page-head"><div><h1>Appointment</h1><div class="sub">Không gửi tin nhắn nhắc khách</div></div></div>';
   h+='<div class="sub-tabs">'+["Office","Daniel","Peter","Work Schedule"].map(function(n){return '<button class="btn'+(who===n?' on':'')+'" data-sub="'+n+'">'+n+'</button>'}).join("");
-  if(who!=="Work Schedule")h+='<span style="width:16px"></span><button class="btn" id="pw">‹ Tuần trước</button><b>'+md(S.weekStart)+' – '+md(days[6])+'/'+days[6].slice(0,4)+'</b><button class="btn" id="nw">Tuần sau ›</button>';
+  if(who!=="Work Schedule")h+='<span style="width:16px"></span><button class="btn" id="pw">‹ Tuần trước</button><b>'+md(S.weekStart)+' – '+md(days[6])+'/'+days[6].slice(0,4)+'</b><button class="btn" id="nw">Tuần sau ›</button>'+(S.bkWeeks[S.weekStart]?'':'<span class="muted small">đang tải…</span>');
   h+='<span style="flex:1"></span><label class="small muted">Font <select id="apFont">'+APPT_FONTS.map(function(f){return '<option value="'+f[0]+'"'+(f[0]===apFontName()?' selected':'')+' style="font-family:'+f[1]+'">'+f[0]+'</option>'}).join("")+'</select></label></div>';
   if(who==="Work Schedule")return wrapFont(h+pageSchedule());
   h+='<div class="muted small" style="margin-bottom:8px">'+(who==="Office"?'Hiển thị: (Preparer) Client (số files), phone ở dòng dưới · ':'')+'* = có ghi chú (rê chuột để xem) · ô xám = ngoài giờ (vẫn đặt được) · cột đen = nghỉ cả ngày · kéo ô hẹn thả sang khung giờ khác (hoặc mở ô hẹn rồi đổi Date / Time)'+(who!=="Office"?' · <b>kéo thanh xanh ở cạnh dưới ô hẹn để kéo dài thêm slot</b>':'')+'</div>';
@@ -676,7 +686,7 @@ function pageAppt(){
       var cls="c"+(bk?" bk":cl?" closed":"")+(bk&&cl?" extra":"");
       var star=bk&&bk.note?'<span class="star">*</span>':'',txt="";
       if(bk)txt=(bk.s?'('+esc(bk.s)+') ':'')+esc(bk.n)+' ('+bk.f+')'+star+'<br><span class="ph">'+esc(bk.p)+'</span>'+(span>1?'<span class="rg">'+hm(sl)+' – '+hm(sl+span*S.cal[who].step)+'</span>':'');
-      h+='<td class="'+cls+'" data-k="'+key+'"'+(span>1?' rowspan="'+span+'"':'')+' title="'+(bk?esc((bk.s?bk.s+' · ':'')+bk.n+' '+bk.p+' · '+bk.f+' files'+(bk.note?' · '+bk.note:'')):'')+'">'+txt+(bk&&who!=="Office"?'<div class="rz" title="Kéo xuống để kéo dài"></div>':'')+'</td>'});
+      h+='<td class="'+cls+'" data-k="'+key+'"'+(span>1?' rowspan="'+span+'"':'')+' title="'+(bk?esc((bk.s?bk.s+' · ':'')+bk.n+' '+bk.p+' · '+bk.f+' files'+(bk.note?' · '+bk.note:'')):'')+'">'+txt+(bk?'<button class="bx" data-bx="'+key+'" title="Xóa hẹn" draggable="false">×</button>':'')+(bk&&who!=="Office"?'<div class="rz" title="Kéo xuống để kéo dài"></div>':'')+'</td>'});
     h+='</tr>'});
   return wrapFont(h+'</table></div>');
 }
@@ -782,7 +792,7 @@ function bindSettings(){
   $$("[data-hx]").forEach(function(e){e.onchange=function(){S.hours[e.getAttribute("data-hx")]=e.checked?null:["09:00","18:00"];saveHours();render()}});
   $$("[data-ho]").forEach(function(e){e.onchange=function(){S.hours[e.getAttribute("data-ho")][0]=e.value;saveHours()}});
   $$("[data-hc]").forEach(function(e){e.onchange=function(){S.hours[e.getAttribute("data-hc")][1]=e.value;saveHours()}});
-  var saveCal=function(){putSetting("cal",S.cal);S.bkWeek=null};
+  var saveCal=function(){putSetting("cal",S.cal)};
   $$("[data-cs]").forEach(function(e){e.onchange=function(){S.cal[e.getAttribute("data-cs")].start=e.value;saveCal()}});
   $$("[data-ce]").forEach(function(e){e.onchange=function(){S.cal[e.getAttribute("data-ce")].last=e.value;saveCal()}});
   $$("[data-cl]").forEach(function(e){e.onchange=function(){S.cal[e.getAttribute("data-cl")].step=+e.value;saveCal()}});
@@ -815,16 +825,7 @@ function render(){
   renderNav();
   var p=S.page,pg=$("#page"),h;
   pg.className="page"+((p==="appt"||sById(p)||p==="attn"||p==="records"||p==="search")?" wide":"");
-  if(p==="appt"&&S.apptSub!=="Work Schedule"&&S.bkWeek!==S.weekStart){
-    pg.innerHTML='<div class="muted">Đang tải lịch…</div>';
-    var wk=S.weekStart;
-    api("GET","/bookings?from="+wk+"&to="+addDays(wk,6)).then(function(list){
-      Object.keys(S.bookings).forEach(function(k){var d=k.split("|")[1];if(d>=wk&&d<=addDays(wk,6))delete S.bookings[k]});
-      list.forEach(function(b){S.bookings[b.cal+"|"+b.date+"|"+b.slot]={n:b.n,p:b.p,f:b.f,s:b.s,note:b.note,span:b.span,id:b.id}});
-      S.bkWeek=wk;if(S.page==="appt"&&S.weekStart===wk)render();
-    }).catch(fail);
-    return;
-  }
+  if(p==="appt"&&S.apptSub!=="Work Schedule")ensureWeeks();
   if(p==="records"&&!S.rec){
     pg.innerHTML='<div class="muted">Đang tải Records…</div>';
     if(!S.recLoading){S.recLoading=true;api("GET","/records/daily").then(function(d){
