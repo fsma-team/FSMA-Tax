@@ -1,0 +1,11 @@
+{
+  "name": "fsma-tax",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "FSMA Tax (tax.fsma.team)",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "postgres": "^3.4.4"
+  }
+}

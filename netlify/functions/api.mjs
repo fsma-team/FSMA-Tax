@@ -1,0 +1,678 @@
+// tax.fsma.team - single API function. Every request goes to /api/...
+import bcrypt from 'bcryptjs';
+import {
+  db, json, HttpError, requireUser, requireAdmin, createSession, cookieHeader, env,
+  s, isoDate, num, bool, nameKey, todayLA, hhmm, toMin,
+} from '../lib/core.mjs';
+
+const STATUS = ['', 'E-file', 'Accepted', 'Rejected', 'Hold', 'Paper Mailed', 'Refund'];
+const METHODS = ['Cash', 'Check', 'Zelle', 'Venmo'];
+const COLORS = ['Rose', 'Blue', 'Sunshine', 'Green', 'Orange', 'Purple', 'Teal', 'Pink'];
+const FONTS = ['Pacifico', 'Lobster', 'Comfortaa', 'Montserrat', 'Nunito', 'Oswald', 'Gloria Hallelujah', 'Quicksand'];
+const APPT_FONTS = ['Default', 'Nunito', 'Quicksand', 'Montserrat', 'Comfortaa'];
+const CALS = ['Office', 'Daniel', 'Peter'];
+const TEMP_PW = '12345';
+const DUMMY_HASH = '$2a$10$c5w3A/iP.Nz2R0t0kPqxZ.ePVDX4qlS0yi0wvUulgrpcYeICZUreG';
+
+// ---------- auth ----------
+async function login(req) {
+  const body = await req.json().catch(() => ({}));
+  const username = s(body.username, 40) || '';
+  const password = String(body.password || '');
+  const sql = db();
+  const [u] = await sql`select * from users where lower(username)=lower(${username})`;
+  if (!u || !u.active) {
+    await bcrypt.compare(password, DUMMY_HASH);
+    throw new HttpError(401, 'Wrong username or password');
+  }
+  if (u.lock_until && new Date(u.lock_until) > new Date()) {
+    const t = new Date(u.lock_until).toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit' });
+    throw new HttpError(423, `Too many wrong tries. Locked until ${t}. An admin can unlock it.`);
+  }
+  const ok = await bcrypt.compare(password, u.pw_hash);
+  if (!ok) {
+    // atomic: 5 wrong = lock 15 min, then 30, 60 ... up to 24h
+    const [r] = await sql`update users set
+        failed_count = case when failed_count + 1 >= 5 then 0 else failed_count + 1 end,
+        lock_until = case when failed_count + 1 >= 5 then now() + least(15 * power(2, lock_level), 1440) * interval '1 minute' else lock_until end,
+        lock_level = case when failed_count + 1 >= 5 then least(lock_level + 1, 7) else lock_level end
+      where id=${u.id} returning failed_count`;
+    if (r.failed_count === 0) throw new HttpError(423, 'Too many wrong tries. Account locked for a while. An admin can unlock it.');
+    throw new HttpError(401, `Wrong username or password (${5 - r.failed_count} tries left)`);
+  }
+  await sql`update users set failed_count=0, lock_level=0, lock_until=null, last_login_at=now() where id=${u.id}`;
+  await sql`delete from sessions where expires_at < now() or last_seen < now() - interval '1 day'`;
+  const sess = await createSession(u.id);
+  return json({ ok: true }, 200, { 'set-cookie': cookieHeader(sess.token, sess.maxAge) });
+}
+
+async function health() {
+  const out = { DATABASE_URL: !!env('DATABASE_URL') };
+  try {
+    const [r] = await db()`select (select count(*)::int from users) as users, (select count(*)::int from staff_tabs) as tabs, (select count(*)::int from records_clients) as records`;
+    out.database = 'connected'; out.users = r.users; out.tabs = r.tabs; out.records_clients = r.records;
+  } catch (e) { out.database = 'ERROR: ' + String(e.message || e).replace(/postgres(ql)?:\/\/[^\s]+/g, '[url]').slice(0, 200); }
+  return json(out);
+}
+
+const meOut = (u) => ({ id: u.id, username: u.username, full_name: u.full_name, display_name: u.display_name, role: u.role, tab_id: u.tab_id, must_change: u.must_change, appt_font: u.appt_font });
+
+async function changePassword(user, body) {
+  const sql = db();
+  const [u] = await sql`select pw_hash from users where id=${user.id}`;
+  if (!(await bcrypt.compare(String(body.old || ''), u.pw_hash))) throw new HttpError(400, 'Current password is wrong');
+  const nw = String(body.new || '');
+  if (nw.length < 8) throw new HttpError(400, 'New password must be at least 8 characters');
+  if (nw === TEMP_PW || nw === String(body.old || '')) throw new HttpError(400, 'Choose a different password');
+  const h = await bcrypt.hash(nw, 10);
+  await sql`update users set pw_hash=${h}, must_change=false where id=${user.id}`;
+  await sql`delete from sessions where user_id=${user.id} and token_hash<>${user.token_hash}`;
+  return { ok: true };
+}
+
+// ---------- settings ----------
+async function getSettings(sql) {
+  const rows = await sql`select key, value from settings`;
+  const o = {}; rows.forEach((r) => { o[r.key] = r.value; });
+  return o;
+}
+const HHMM = /^\d{2}:\d{2}$/;
+function checkSetting(key, v) {
+  if (key === 'notice') { if (typeof v !== 'string' || v.length > 500) throw new HttpError(400, 'Bad notice'); return v; }
+  if (key === 'season_year') { const n = Number(v); if (!Number.isInteger(n) || n < 2000 || n > 2100) throw new HttpError(400, 'Bad year'); return n; }
+  if (key === 'retirement') {
+    if (!Array.isArray(v) || v.length > 20) throw new HttpError(400, 'Bad list');
+    return v.map((x) => [String(x?.[0] ?? '').slice(0, 60), String(x?.[1] ?? '').slice(0, 60)]);
+  }
+  if (key === 'email_formats') {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) throw new HttpError(400, 'Bad formats');
+    const o = {};
+    for (const k of Object.keys(v).slice(0, 20)) o[k.slice(0, 40)] = String(v[k] ?? '').slice(0, 4000);
+    return o;
+  }
+  if (key === 'prep_list') {
+    if (!Array.isArray(v) || v.length > 30) throw new HttpError(400, 'Bad list');
+    return v.map((x) => String(x).trim().slice(0, 40)).filter(Boolean);
+  }
+  if (key === 'hours') {
+    const o = {};
+    for (let i = 0; i < 7; i++) {
+      const h = v?.[i] ?? v?.[String(i)] ?? null;
+      if (h === null) { o[i] = null; continue; }
+      if (!Array.isArray(h) || !HHMM.test(h[0]) || !HHMM.test(h[1])) throw new HttpError(400, 'Bad hours');
+      o[i] = [h[0], h[1]];
+    }
+    return o;
+  }
+  if (key === 'cal') {
+    const o = {};
+    for (const c of CALS) {
+      const x = v?.[c];
+      if (!x || !HHMM.test(x.start) || !HHMM.test(x.last) || ![30, 60].includes(Number(x.step))) throw new HttpError(400, 'Bad calendar settings');
+      if (toMin(x.last) < toMin(x.start)) throw new HttpError(400, 'Last appointment is before first slot');
+      o[c] = { start: x.start, last: x.last, step: Number(x.step) };
+    }
+    return o;
+  }
+  throw new HttpError(400, 'Unknown setting');
+}
+
+// ---------- rows ----------
+const rowOut = (r) => ({
+  id: Number(r.id), tab: r.tab_id, pos: r.pos, date: r.work_date || '', status: r.status, name: r.name, ssn: r.ssn,
+  amt: Number(r.amount), method: r.method, online: r.online, esign: r.esign, paid: r.paid, paidDate: r.paid_date || '',
+  note: r.note, tip: Number(r.tip),
+});
+const LABEL = { date: 'Date', status: 'Status', name: 'Name', ssn: 'SSN', amt: 'Tiền', method: 'Method', online: 'Online', esign: 'E-sign', paid: 'Paid', note: 'Notes', tip: 'Tips' };
+const PARSE = {
+  date: (v) => isoDate(v),
+  status: (v) => { const t = String(v ?? ''); if (!STATUS.includes(t)) throw new HttpError(400, 'Bad status'); return t; },
+  name: (v) => String(v ?? '').trim().replace(/\s+/g, ' ').slice(0, 120),
+  ssn: (v) => { const t = String(v ?? '').trim(); if (!/^\d{0,4}$/.test(t)) throw new HttpError(400, 'SSN: only the last 4 digits'); return t; },
+  amt: (v) => num(v, { min: -100000, max: 100000 }),
+  method: (v) => { const t = String(v ?? 'Cash'); if (!METHODS.includes(t)) throw new HttpError(400, 'Bad method'); return t; },
+  online: bool, esign: bool, paid: bool,
+  note: (v) => String(v ?? '').slice(0, 300),
+  tip: (v) => num(v, { min: 0, max: 100000 }),
+};
+const fmtVal = (f, v) => (v === true ? '✓' : v === false ? '✗' : (v === '' || v === null || v === undefined) ? '(trống)' : f === 'date' ? mdy(v) : String(v));
+const mdy = (d) => { const p = String(d).split('-'); return p.length === 3 ? `${p[1]}/${p[2]}/${p[0]}` : d; };
+const money = (n) => (n < 0 ? '-' : '') + '$' + Math.abs(n).toLocaleString('en-US');
+
+function canEditTab(user, tabId) { return user.role === 'admin' || user.tab_id === tabId; }
+
+async function tabInfo(sql, id) {
+  const [t] = await sql`select id, name, sheet_len from staff_tabs where id=${id} and deleted_at is null`;
+  if (!t) throw new HttpError(404, 'Tab not found');
+  return t;
+}
+
+function applyFields(base, fields) {
+  const out = { ...base };
+  for (const [k, v] of Object.entries(fields || {})) {
+    if (!PARSE[k]) continue;
+    out[k] = PARSE[k](v);
+  }
+  if (!out.online) { out.esign = false; out.paid = false; out.paidDate = ''; }
+  return out;
+}
+
+async function createRow(user, body) {
+  const sql = db();
+  const tabId = Number(body.tab_id), pos = Number(body.pos);
+  if (!Number.isInteger(tabId) || !Number.isInteger(pos) || pos < 0 || pos > 100000) throw new HttpError(400, 'Bad row position');
+  await tabInfo(sql, tabId);
+  if (!canEditTab(user, tabId)) throw new HttpError(403, 'You can only edit your own tab');
+  const base = { date: '', status: '', name: '', ssn: '', amt: 0, method: 'Cash', online: false, esign: false, paid: false, paidDate: '', note: '', tip: 0 };
+  const r = applyFields(base, body.fields);
+  if (r.paid) r.paidDate = todayLA();
+  try {
+    const [row] = await sql`insert into rows (tab_id,pos,work_date,status,name,name_key,ssn,amount,method,online,esign,paid,paid_date,note,tip,updated_by)
+      values (${tabId},${pos},${r.date || null},${r.status},${r.name},${nameKey(r.name)},${r.ssn},${r.amt},${r.method},${r.online},${r.esign},${r.paid},${r.paidDate || null},${r.note},${r.tip},${user.display_name})
+      returning *`;
+    return rowOut(row);
+  } catch (e) {
+    if (e.code === '23505') throw new HttpError(409, 'Dòng này vừa có người nhập. Đang tải lại.');
+    throw e;
+  }
+}
+
+async function updateRow(user, id, body) {
+  const sql = db();
+  return sql.begin(async (t) => {
+    const [old] = await t`select r.*, st.name as tab_name from rows r join staff_tabs st on st.id=r.tab_id where r.id=${id} for update of r`;
+    if (!old || old.deleted_at) throw new HttpError(404, 'Row not found');
+    if (!canEditTab(user, old.tab_id)) throw new HttpError(403, 'You can only edit your own tab');
+    const cur = rowOut(old);
+    const fields = body.fields || (body.f ? { [body.f]: body.v } : {});
+    const nw = applyFields(cur, fields);
+    if (nw.paid !== cur.paid) nw.paidDate = nw.paid ? todayLA() : '';
+    const changed = Object.keys(LABEL).filter((k) => nw[k] !== cur[k]);
+    if (!changed.length) return cur;
+    const [row] = await t`update rows set work_date=${nw.date || null}, status=${nw.status}, name=${nw.name}, name_key=${nameKey(nw.name)}, ssn=${nw.ssn},
+        amount=${nw.amt}, method=${nw.method}, online=${nw.online}, esign=${nw.esign}, paid=${nw.paid}, paid_date=${nw.paidDate || null},
+        note=${nw.note}, tip=${nw.tip}, updated_at=now(), updated_by=${user.display_name} where id=${id} returning *`;
+    if (old.status === 'Accepted') {
+      for (const k of changed) {
+        await t`insert into activity_log (user_name, tab_name, kind, text, row_id) values (${user.display_name}, ${old.tab_name}, 'edit',
+          ${`${cur.name || '(trống)'} (Accepted) · ${LABEL[k]}: ${fmtVal(k, cur[k])} → ${fmtVal(k, nw[k])}`}, ${id})`;
+      }
+    }
+    return rowOut(row);
+  });
+}
+
+async function deleteRow(user, id) {
+  const sql = db();
+  return sql.begin(async (t) => {
+    const [old] = await t`select r.*, st.name as tab_name from rows r join staff_tabs st on st.id=r.tab_id where r.id=${id} for update of r`;
+    if (!old || old.deleted_at) throw new HttpError(404, 'Row not found');
+    if (!canEditTab(user, old.tab_id)) throw new HttpError(403, 'You can only edit your own tab');
+    await t`update rows set deleted_at=now(), updated_at=now(), updated_by=${user.display_name} where id=${id}`;
+    const snap = rowOut(old);
+    await t`insert into activity_log (user_name, tab_name, kind, text, row_id, snapshot) values (${user.display_name}, ${old.tab_name}, 'delete',
+      ${`${snap.name || '(trống)'} · ${snap.status || '—'} · ${money(snap.amt)} · ${snap.date ? mdy(snap.date) : ''}`}, ${id}, ${t.json(snap)})`;
+    return { ok: true };
+  });
+}
+
+async function restoreRow(user, logId) {
+  const sql = db();
+  return sql.begin(async (t) => {
+    const [l] = await t`select * from activity_log where id=${logId} and kind='delete' for update`;
+    if (!l || !l.snapshot || l.snapshot.restored) throw new HttpError(404, 'Nothing to restore');
+    const id = l.snapshot.id;
+    const [r] = await t`select * from rows where id=${id} for update`;
+    if (!r || !r.deleted_at) throw new HttpError(400, 'This row is already back');
+    const [clash] = await t`select 1 as x from rows where tab_id=${r.tab_id} and pos=${r.pos} and deleted_at is null`;
+    if (clash) {
+      const [{ p }] = await t`select coalesce(max(pos),-1)+1 as p from rows where tab_id=${r.tab_id} and deleted_at is null`;
+      await t`update rows set deleted_at=null, pos=${p}, updated_at=now() where id=${id}`;
+    } else {
+      await t`update rows set deleted_at=null, updated_at=now() where id=${id}`;
+    }
+    await t`update activity_log set snapshot = snapshot || '{"restored":true}'::jsonb where id=${logId}`;
+    await t`insert into activity_log (user_name, tab_name, kind, text, row_id) values (${user.display_name}, ${l.tab_name}, 'restore', ${'Khôi phục hồ sơ: ' + (l.snapshot.name || '(trống)')}, ${id})`;
+    return { ok: true };
+  });
+}
+
+async function listRows(url) {
+  const sql = db();
+  const since = url.searchParams.get('since');
+  let rows;
+  if (since) {
+    const d = new Date(since);
+    if (Number.isNaN(d.getTime())) throw new HttpError(400, 'Bad since');
+    rows = await sql`select r.* from rows r join staff_tabs t on t.id=r.tab_id and t.deleted_at is null where r.updated_at > ${d}`;
+  } else {
+    rows = await sql`select r.* from rows r join staff_tabs t on t.id=r.tab_id and t.deleted_at is null where r.deleted_at is null order by r.tab_id, r.pos`;
+  }
+  const [{ now }] = await sql`select now() as now`;
+  return { now, rows: rows.map((r) => (r.deleted_at ? { id: Number(r.id), tab: r.tab_id, deleted: true } : rowOut(r))) };
+}
+
+// ---------- tabs ----------
+const tabOut = (t) => ({ id: t.id, name: t.name, color: t.color, font: t.font, title: t.title, tagline: t.tagline, sort: t.sort, sheet_len: t.sheet_len });
+
+async function createTab(user, body) {
+  requireAdmin(user);
+  const name = s(body.name, 40);
+  if (!name) throw new HttpError(400, 'Name is required');
+  const sql = db();
+  const [{ n }] = await sql`select coalesce(max(sort),0)+1 as n from staff_tabs`;
+  const [t] = await sql`insert into staff_tabs (name,color,font,title,tagline,sort) values (${name},'Teal','Quicksand',${name},'',${n}) returning *`;
+  return tabOut(t);
+}
+async function updateTab(user, id, body) {
+  const sql = db();
+  const [t] = await sql`select * from staff_tabs where id=${id} and deleted_at is null`;
+  if (!t) throw new HttpError(404, 'Tab not found');
+  if (body.name !== undefined) requireAdmin(user);       // only Admin renames a tab; anyone edits the banner
+  const name = body.name !== undefined ? (s(body.name, 40) || t.name) : t.name;
+  const color = body.color !== undefined ? (COLORS.includes(body.color) ? body.color : (() => { throw new HttpError(400, 'Bad color'); })()) : t.color;
+  const font = body.font !== undefined ? (FONTS.includes(body.font) ? body.font : (() => { throw new HttpError(400, 'Bad font'); })()) : t.font;
+  const title = body.title !== undefined ? (s(body.title, 60) || name) : t.title;
+  const tagline = body.tagline !== undefined ? (s(body.tagline, 120) || '') : t.tagline;
+  const [u] = await sql`update staff_tabs set name=${name}, color=${color}, font=${font}, title=${title}, tagline=${tagline} where id=${id} returning *`;
+  return tabOut(u);
+}
+async function orderTabs(user, body) {
+  requireAdmin(user);
+  const ids = Array.isArray(body.ids) ? body.ids.map(Number).filter(Number.isInteger) : [];
+  const sql = db();
+  await sql.begin(async (t) => { for (let i = 0; i < ids.length; i++) await t`update staff_tabs set sort=${i + 1} where id=${ids[i]}`; });
+  return { ok: true };
+}
+async function deleteTab(user, id) {
+  requireAdmin(user);
+  await db()`update staff_tabs set deleted_at=now() where id=${id}`;
+  return { ok: true };
+}
+async function extendTab(user, id) {
+  const sql = db();
+  await tabInfo(sql, id);
+  if (!canEditTab(user, id)) throw new HttpError(403, 'You can only edit your own tab');
+  const [t] = await sql`update staff_tabs set sheet_len = least(sheet_len + 50, 5000) where id=${id} returning sheet_len`;
+  return { sheet_len: t.sheet_len };
+}
+
+// ---------- users (Admin) ----------
+const userOut = (u) => ({ id: u.id, username: u.username, full_name: u.full_name, display_name: u.display_name, role: u.role, tab_id: u.tab_id, active: u.active, must_change: u.must_change, locked: !!(u.lock_until && new Date(u.lock_until) > new Date()) });
+async function listUsers() {
+  return (await db()`select * from users order by id`).map(userOut);
+}
+async function createUser(user, body) {
+  requireAdmin(user);
+  const username = s(body.username, 40), full = s(body.full_name, 80), disp = s(body.display_name, 40);
+  if (!username || !/^[A-Za-z0-9._-]+$/.test(username)) throw new HttpError(400, 'Username: letters, numbers, . _ - only');
+  if (!full || !disp) throw new HttpError(400, 'Full name and display name are required');
+  const role = body.role === 'admin' ? 'admin' : 'preparer';
+  const tab = body.tab_id ? Number(body.tab_id) : null;
+  const h = await bcrypt.hash(TEMP_PW, 10);
+  try {
+    const [u] = await db()`insert into users (username,full_name,display_name,role,tab_id,pw_hash,must_change) values (${username},${full},${disp},${role},${tab},${h},true) returning *`;
+    return userOut(u);
+  } catch (e) {
+    if (e.code === '23505') throw new HttpError(400, 'That username already exists');
+    throw e;
+  }
+}
+async function updateUser(user, id, body) {
+  requireAdmin(user);
+  const sql = db();
+  const [u] = await sql`select * from users where id=${id}`;
+  if (!u) throw new HttpError(404, 'User not found');
+  const role = body.role === undefined ? u.role : (body.role === 'admin' ? 'admin' : 'preparer');
+  const active = body.active === undefined ? u.active : bool(body.active);
+  if ((role !== 'admin' || !active) && u.role === 'admin') {
+    const [{ n }] = await sql`select count(*)::int as n from users where role='admin' and active and id<>${id}`;
+    if (n === 0) throw new HttpError(400, 'There must be at least one active Admin');
+  }
+  const disp = body.display_name === undefined ? u.display_name : (s(body.display_name, 40) || u.display_name);
+  const tab = body.tab_id === undefined ? u.tab_id : (body.tab_id ? Number(body.tab_id) : null);
+  const [r] = await sql`update users set role=${role}, active=${active}, display_name=${disp}, tab_id=${tab} where id=${id} returning *`;
+  if (!active) await sql`delete from sessions where user_id=${id}`;
+  return userOut(r);
+}
+async function resetUser(user, id) {
+  requireAdmin(user);
+  const sql = db();
+  const h = await bcrypt.hash(TEMP_PW, 10);
+  const [u] = await sql`update users set pw_hash=${h}, must_change=true, failed_count=0, lock_level=0, lock_until=null where id=${id} returning *`;
+  if (!u) throw new HttpError(404, 'User not found');
+  await sql`delete from sessions where user_id=${id}`;
+  return userOut(u);
+}
+async function unlockUser(user, id) {
+  requireAdmin(user);
+  const [u] = await db()`update users set failed_count=0, lock_level=0, lock_until=null where id=${id} returning *`;
+  if (!u) throw new HttpError(404, 'User not found');
+  return userOut(u);
+}
+
+// ---------- blackouts ----------
+async function addBlackout(user, body) {
+  requireAdmin(user);
+  const day = isoDate(body.day); if (!day) throw new HttpError(400, 'Date is required');
+  const who = body.who === 'all' || CALS.includes(body.who) ? body.who : 'all';
+  const [b] = await db()`insert into blackouts (day,who,note) values (${day},${who},${s(body.note, 80) || 'Nghỉ'}) returning *`;
+  return { id: b.id, date: b.day, who: b.who, note: b.note };
+}
+async function delBlackout(user, id) {
+  requireAdmin(user);
+  await db()`delete from blackouts where id=${id}`;
+  return { ok: true };
+}
+
+// ---------- bookings ----------
+const bookOut = (b) => ({ id: Number(b.id), cal: b.cal, date: b.day, slot: b.slot, span: b.span, n: b.client, p: b.phone, f: b.files, s: b.preparer, note: b.note });
+async function listBookings(url) {
+  const from = isoDate(url.searchParams.get('from')), to = isoDate(url.searchParams.get('to'));
+  if (!from || !to) throw new HttpError(400, 'from and to are required');
+  return (await db()`select * from bookings where day between ${from} and ${to} order by day, slot`).map(bookOut);
+}
+const dayKeys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+async function saveBooking(user, body) {
+  const sql = db();
+  const cal = body.cal;
+  if (!CALS.includes(cal)) throw new HttpError(400, 'Bad calendar');
+  const day = isoDate(body.day);
+  const slot = String(body.slot || '');
+  const client = s(body.client, 100), phone = s(body.phone, 30), files = Number(body.files);
+  if (!client || !phone || !Number.isInteger(files) || files < 1 || files > 99) throw new HttpError(400, 'Cần điền Client name, Phone và Files.');
+  const span = Math.max(1, Number(body.span) || 1);
+  const prep = cal === 'Office' ? (s(body.preparer, 40) || '') : '';
+  const note = s(body.note, 200) || '';
+  const old = body.old && body.old.cal ? { cal: body.old.cal, day: isoDate(body.old.day), slot: String(body.old.slot) } : null;
+  return sql.begin(async (t) => {
+    const st = await getSettings(t);
+    const c = st.cal?.[cal];
+    if (!c) throw new HttpError(400, 'Calendar is not set up');
+    const slots = []; for (let m = toMin(c.start); m <= toMin(c.last); m += c.step) slots.push(hhmm(m));
+    const si = slots.indexOf(slot);
+    if (si < 0) throw new HttpError(400, 'Giờ đó không có trong lịch.');
+    if (si + span > slots.length) throw new HttpError(400, 'Không đủ chỗ ở khung giờ đó.');
+    const wd = new Date(day + 'T00:00:00Z').getUTCDay();
+    if (!st.hours?.[String(wd)]) throw new HttpError(400, 'Ngày đó đóng cửa.');
+    const [bo] = await t`select 1 as x from blackouts where day=${day} and (who='all' or who=${cal}) limit 1`;
+    if (bo) throw new HttpError(400, 'Ngày đó đang nghỉ.');
+    if (cal !== 'Office') {
+      const [p] = await t`select id from sched_periods where ${day} between start_date and end_date limit 1`;
+      if (p) {
+        const [r] = await t`select days from sched_rows where period_id=${p.id} and name=${cal} limit 1`;
+        if (r && !(dayKeys[wd] in r.days)) throw new HttpError(400, 'Ngày đó đang nghỉ.');
+      }
+    }
+    // overlap with other bookings that day (ignore the booking being moved)
+    const others = await t`select slot, span from bookings where cal=${cal} and day=${day}`;
+    const mine = new Set(); for (let i = si; i < si + span; i++) mine.add(i);
+    for (const o of others) {
+      if (old && old.cal === cal && old.day === day && old.slot === o.slot) continue;
+      const oi = slots.indexOf(o.slot);
+      for (let i = oi; i < oi + o.span; i++) if (mine.has(i)) throw new HttpError(400, 'Không đủ chỗ ở khung giờ đó.');
+    }
+    if (old) await t`delete from bookings where cal=${old.cal} and day=${old.day} and slot=${old.slot}`;
+    const [b] = await t`insert into bookings (cal,day,slot,span,client,phone,files,preparer,note,created_by)
+      values (${cal},${day},${slot},${span},${client},${phone},${files},${prep},${note},${user.display_name})
+      on conflict (cal,day,slot) do update set span=excluded.span, client=excluded.client, phone=excluded.phone, files=excluded.files,
+        preparer=excluded.preparer, note=excluded.note, updated_at=now()
+      returning *`;
+    return bookOut(b);
+  });
+}
+async function deleteBooking(url) {
+  const cal = url.searchParams.get('cal'), day = isoDate(url.searchParams.get('day')), slot = url.searchParams.get('slot');
+  if (!CALS.includes(cal) || !day || !slot) throw new HttpError(400, 'Bad request');
+  await db()`delete from bookings where cal=${cal} and day=${day} and slot=${slot}`;
+  return { ok: true };
+}
+
+// ---------- schedule ----------
+async function getSched(sql) {
+  const ps = await sql`select * from sched_periods order by start_date`;
+  const rs = await sql`select * from sched_rows order by period_id, sort, id`;
+  return ps.map((p) => ({ id: p.id, start: p.start_date, end: p.end_date, week: p.hours_week, sat: p.hours_sat, sun: p.hours_sun,
+    rows: rs.filter((r) => r.period_id === p.id).map((r) => ({ n: r.name, note: r.note, hrs: r.hrs, days: r.days })) }));
+}
+const DKEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+async function putSched(user, body) {
+  requireAdmin(user);
+  const periods = Array.isArray(body.periods) ? body.periods : [];
+  if (periods.length > 60) throw new HttpError(400, 'Too many periods');
+  const clean = periods.map((p) => {
+    const start = isoDate(p.start), end = isoDate(p.end);
+    if (!start || !end || end < start) throw new HttpError(400, 'Bad period dates');
+    return { start, end, week: String(p.week || '').slice(0, 30), sat: String(p.sat || '').slice(0, 30), sun: String(p.sun || '').slice(0, 30),
+      rows: (Array.isArray(p.rows) ? p.rows : []).slice(0, 60).map((r) => {
+        const days = {};
+        for (const k of DKEYS) if (r.days && k in r.days) days[k] = String(r.days[k] || '').slice(0, 20);
+        return { n: String(r.n || '').trim().slice(0, 40) || 'Name', note: String(r.note || '').slice(0, 60), hrs: String(r.hrs || '').slice(0, 30), days };
+      }) };
+  });
+  await db().begin(async (t) => {
+    await t`delete from sched_periods`;
+    for (const p of clean) {
+      const [{ id }] = await t`insert into sched_periods (start_date,end_date,hours_week,hours_sat,hours_sun) values (${p.start},${p.end},${p.week},${p.sat},${p.sun}) returning id`;
+      for (let i = 0; i < p.rows.length; i++) {
+        const r = p.rows[i];
+        await t`insert into sched_rows (period_id,name,note,hrs,days,sort) values (${id},${r.n},${r.note},${r.hrs},${t.json(r.days)},${i})`;
+      }
+    }
+  });
+  return { ok: true };
+}
+
+// ---------- fees ----------
+async function getFees(sql) {
+  const items = await sql`select * from fee_items order by sec_sort, sort, id`;
+  const tiers = await sql`select * from fee_tiers order by sort, id`;
+  const secs = []; const idx = {};
+  items.forEach((i) => { if (!(i.section in idx)) { idx[i.section] = secs.length; secs.push([i.section, []]); } secs[idx[i.section]][1].push([i.item, i.fee, i.note]); });
+  return { fees: secs, tiers: tiers.map((t) => [t.title, t.heads, t.vals]) };
+}
+async function putFees(user, body) {
+  requireAdmin(user);
+  const secs = Array.isArray(body.fees) ? body.fees : [];
+  const tiers = Array.isArray(body.tiers) ? body.tiers : [];
+  const S = (v, n) => String(v ?? '').slice(0, n);
+  await db().begin(async (t) => {
+    await t`delete from fee_items`; await t`delete from fee_tiers`;
+    for (let si = 0; si < secs.length; si++) {
+      const [title, its] = secs[si];
+      for (let ii = 0; ii < (its || []).length; ii++) {
+        await t`insert into fee_items (section,sec_sort,item,fee,note,sort) values (${S(title, 80)},${si},${S(its[ii][0], 120)},${S(its[ii][1], 60)},${S(its[ii][2], 200)},${ii})`;
+      }
+    }
+    for (let ti = 0; ti < tiers.length; ti++) {
+      const [title, heads, vals] = tiers[ti];
+      const rows = Array.isArray(vals) && vals.length && Array.isArray(vals[0])
+        ? vals.slice(0, 10).map((r) => [S(r[0], 120), (r[1] || []).map((x) => S(x, 30))])
+        : [['Fees', (vals || []).map((x) => S(x, 30))]];
+      await t`insert into fee_tiers (title,sort,heads,vals) values (${S(title, 120)},${ti},${t.json((heads || []).map((x) => S(x, 30)))},${t.json(rows)})`;
+    }
+  });
+  return { ok: true };
+}
+
+// ---------- records (old seasons) ----------
+async function recordsDaily() {
+  const rows = await db()`select year, preparer, day, clients, income, tips, ef, accepted, others from records_daily order by year, preparer, day`;
+  return { rows: rows.map((r) => [r.year, r.preparer, r.day, r.clients, Number(r.income), Number(r.tips), r.ef, r.accepted, r.others]) };
+}
+async function recordsClients(url) {
+  const sql = db();
+  const years = (url.searchParams.get('years') || '').split(',').map(Number).filter((y) => Number.isInteger(y));
+  const prep = s(url.searchParams.get('prep'), 40);
+  const q = nameKey((url.searchParams.get('q') || '').slice(0, 60));
+  const limit = Math.min(Math.max(Number(url.searchParams.get('limit')) || 100, 1), 500);
+  const offset = Math.max(Number(url.searchParams.get('offset')) || 0, 0);
+  const like = '%' + q.replace(/[%_\\]/g, '\\$&') + '%';
+  const where = sql`${years.length ? sql`year = any(${sql.array(years)}::int[])` : sql`true`}
+      ${prep ? sql`and preparer = ${prep}` : sql``}
+      ${q ? (/^\d{1,4}$/.test(q) ? (q.length === 4 ? sql`and ssn = ${q}` : sql`and ssn like ${q + '%'}`) : sql`and name_key like ${like}`) : sql``}`;
+  const [{ n }] = await sql`select count(*)::int as n from records_clients where ${where}`;
+  const rows = await sql`select year, day, preparer, name, ssn, amount, status, note from records_clients where ${where} order by year desc, day desc, id limit ${limit} offset ${offset}`;
+  return { total: n, rows: rows.map((r) => ({ year: r.year, date: r.day, preparer: r.preparer, name: r.name, ssn: r.ssn, amt: Number(r.amount), status: r.status, note: r.note })) };
+}
+
+// ---------- search (everyone) ----------
+async function search(url) {
+  const sql = db();
+  const q = nameKey((url.searchParams.get('q') || '').slice(0, 60));
+  if (!q) return { total: 0, rows: [] };
+  const digits = /^\d{1,4}$/.test(q);
+  const like = '%' + q.replace(/[%_\\]/g, '\\$&') + '%';
+  const cond = (a) => (digits ? (q.length === 4 ? sql`${sql(a + 'ssn')} = ${q}` : sql`${sql(a + 'ssn')} like ${q + '%'}`) : sql`${sql(a + 'name_key')} like ${like}`);
+  const st = await getSettings(sql);
+  const season = Number(st.season_year) || new Date().getFullYear();
+  const live = await sql`select r.work_date, t.id as tab_id, t.name as tab, r.name, r.ssn, r.amount, r.status, r.note, r.online, r.paid
+      from rows r join staff_tabs t on t.id=r.tab_id and t.deleted_at is null
+      where r.deleted_at is null and r.name <> '' and ${cond('r.')} order by r.work_date desc nulls last limit 150`;
+  const [{ n: nl }] = await sql`select count(*)::int as n from rows r join staff_tabs t on t.id=r.tab_id and t.deleted_at is null where r.deleted_at is null and r.name <> '' and ${cond('r.')}`;
+  const rec = await sql`select year, day, preparer, name, ssn, amount, status, note from records_clients c where ${cond('c.')} order by year desc, day desc limit 150`;
+  const [{ n: nr }] = await sql`select count(*)::int as n from records_clients c where ${cond('c.')}`;
+  const all = [
+    ...live.map((r) => ({ year: season, date: r.work_date || '', preparer: r.tab, tabId: r.tab_id, name: r.name, ssn: r.ssn,
+      amt: r.status === 'Refund' ? -Math.abs(Number(r.amount)) : Number(r.amount), status: r.status,
+      note: r.note + (r.online ? (r.note ? ' · ' : '') + 'Online' + (r.paid ? '' : ', chưa Paid') : '') })),
+    ...rec.map((r) => ({ year: r.year, date: r.day, preparer: r.preparer, tabId: null, name: r.name, ssn: r.ssn, amt: Number(r.amount), status: r.status, note: r.note })),
+  ].sort((a, b) => (a.year !== b.year ? b.year - a.year : (a.date < b.date ? 1 : -1)));
+  return { total: nl + nr, rows: all.slice(0, 100) };
+}
+
+// ---------- activity log (Admin) ----------
+async function listLog() {
+  const rows = await db()`select id, at, user_name, tab_name, kind, text, (snapshot->>'restored') as restored from activity_log order by at desc limit 500`;
+  return rows.map((r) => ({ id: Number(r.id), at: r.at, user: r.user_name, tab: r.tab_name, kind: r.kind, text: r.text, restored: r.restored === 'true' }));
+}
+
+// ---------- backup (Admin) ----------
+async function backup() {
+  const sql = db();
+  const [tabs, users, rows, log, settings, blackouts, bookings, sched, fees] = await Promise.all([
+    sql`select * from staff_tabs order by id`,
+    sql`select id, username, full_name, display_name, role, tab_id, active, must_change, appt_font, created_at, last_login_at from users order by id`,
+    sql`select * from rows order by tab_id, pos`,
+    sql`select * from activity_log order by id`,
+    getSettings(sql),
+    sql`select * from blackouts order by day`,
+    sql`select * from bookings order by day, slot`,
+    getSched(sql),
+    getFees(sql),
+  ]);
+  const body = JSON.stringify({ exported_at: new Date().toISOString(), staff_tabs: tabs, users, rows, activity_log: log, settings, blackouts, bookings, schedule: sched, fees: fees.fees, fee_tiers: fees.tiers });
+  return new Response(body, { status: 200, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'content-disposition': `attachment; filename="tax-backup-${todayLA()}.json"` } });
+}
+
+// ---------- prefs ----------
+async function putPrefs(user, body) {
+  if (!APPT_FONTS.includes(body.appt_font)) throw new HttpError(400, 'Bad font');
+  await db()`update users set appt_font=${body.appt_font} where id=${user.id}`;
+  return { ok: true };
+}
+
+// ---------- boot ----------
+async function boot(user) {
+  const sql = db();
+  const [tabs, settings, blackouts, sched, fees, rowsRes, users] = await Promise.all([
+    sql`select * from staff_tabs where deleted_at is null order by sort, id`,
+    getSettings(sql),
+    sql`select * from blackouts order by day`,
+    getSched(sql),
+    getFees(sql),
+    listRows(new URL('http://x/rows')),
+    user.role === 'admin' ? listUsers() : Promise.resolve([]),
+  ]);
+  return {
+    me: meOut(user),
+    tabs: tabs.map(tabOut),
+    settings,
+    blackouts: blackouts.map((b) => ({ id: b.id, date: b.day, who: b.who, note: b.note })),
+    sched, fees: fees.fees, tiers: fees.tiers,
+    rows: rowsRes.rows, now: rowsRes.now,
+    users,
+  };
+}
+
+// ---------- routes ----------
+// [method, pattern, handler(ctx)]
+const routes = [
+  ['GET', '/me', (x) => ({ user: meOut(x.user) })],
+  ['POST', '/password', (x) => changePassword(x.user, x.body)],
+  ['GET', '/boot', (x) => boot(x.user)],
+  ['GET', '/rows', (x) => listRows(x.url)],
+  ['POST', '/rows', (x) => createRow(x.user, x.body)],
+  ['PATCH', '/rows/:id', (x) => updateRow(x.user, x.id, x.body)],
+  ['DELETE', '/rows/:id', (x) => deleteRow(x.user, x.id)],
+  ['POST', '/tabs', (x) => createTab(x.user, x.body)],
+  ['POST', '/tabs/order', (x) => orderTabs(x.user, x.body)],
+  ['PATCH', '/tabs/:id', (x) => updateTab(x.user, x.id, x.body)],
+  ['DELETE', '/tabs/:id', (x) => deleteTab(x.user, x.id)],
+  ['POST', '/tabs/:id/extend', (x) => extendTab(x.user, x.id)],
+  ['GET', '/users', async (x) => { requireAdmin(x.user); return listUsers(); }],
+  ['POST', '/users', (x) => createUser(x.user, x.body)],
+  ['PATCH', '/users/:id', (x) => updateUser(x.user, x.id, x.body)],
+  ['POST', '/users/:id/reset', (x) => resetUser(x.user, x.id)],
+  ['POST', '/users/:id/unlock', (x) => unlockUser(x.user, x.id)],
+  ['PUT', '/settings/:key', async (x) => {
+    requireAdmin(x.user);
+    const key = x.p.key;
+    const v = checkSetting(key, x.body.value);
+    await db()`insert into settings (key, value) values (${key}, ${db().json(v)}) on conflict (key) do update set value = excluded.value`;
+    return { ok: true, value: v };
+  }],
+  ['POST', '/blackouts', (x) => addBlackout(x.user, x.body)],
+  ['DELETE', '/blackouts/:id', (x) => delBlackout(x.user, x.id)],
+  ['GET', '/bookings', (x) => listBookings(x.url)],
+  ['POST', '/bookings/save', (x) => saveBooking(x.user, x.body)],
+  ['DELETE', '/bookings', (x) => deleteBooking(x.url)],
+  ['PUT', '/sched', (x) => putSched(x.user, x.body)],
+  ['PUT', '/fees', (x) => putFees(x.user, x.body)],
+  ['PUT', '/prefs', (x) => putPrefs(x.user, x.body)],
+  ['GET', '/search', (x) => search(x.url)],
+  ['GET', '/records/daily', async (x) => { requireAdmin(x.user); return recordsDaily(); }],
+  ['GET', '/records/clients', async (x) => { requireAdmin(x.user); return recordsClients(x.url); }],
+  ['GET', '/backup', async (x) => { requireAdmin(x.user); return backup(); }],
+  ['GET', '/log', async (x) => { requireAdmin(x.user); return listLog(); }],
+  ['POST', '/log/:id/restore', async (x) => { requireAdmin(x.user); return restoreRow(x.user, x.id); }],
+].map(([method, pattern, fn]) => {
+  const keys = [];
+  const re = new RegExp('^' + pattern.replace(/:(\w+)/g, (_, k) => { keys.push(k); return '([^/]+)'; }) + '$');
+  return { method, re, keys, fn };
+});
+
+export default async function handler(req) {
+  const url = new URL(req.url);
+  const path = url.pathname.replace(/^\/api/, '').replace(/\/+$/, '') || '/';
+  try {
+    if (req.method !== 'GET' && req.headers.get('x-tax') !== '1') throw new HttpError(403, 'Bad request');
+    if (path === '/login' && req.method === 'POST') return await login(req);
+    if (path === '/health' && req.method === 'GET') return await health();
+    if (path === '/logout' && req.method === 'POST') {
+      try { const u = await requireUser(req); await db()`delete from sessions where token_hash=${u.token_hash}`; } catch { /* already out */ }
+      return json({ ok: true }, 200, { 'set-cookie': cookieHeader('x', 0) });
+    }
+    for (const r of routes) {
+      if (r.method !== req.method) continue;
+      const m = path.match(r.re);
+      if (!m) continue;
+      const user = await requireUser(req);
+      if (user.must_change && !['/me', '/password'].includes(path)) throw new HttpError(403, 'Please change your password first', { must_change: true });
+      const p = {}; r.keys.forEach((k, i) => { p[k] = decodeURIComponent(m[i + 1]); });
+      const body = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) ? await req.json().catch(() => ({})) : {};
+      const id = p.id !== undefined ? Number(p.id) : undefined;
+      if (p.id !== undefined && !Number.isInteger(id)) throw new HttpError(400, 'Bad id');
+      const out = await r.fn({ req, url, user, body, p, id });
+      if (out instanceof Response) return out;
+      return json(out ?? { ok: true });
+    }
+    throw new HttpError(404, 'Not found');
+  } catch (e) {
+    if (e instanceof HttpError) return json({ error: e.message, ...(e.extra || {}) }, e.status);
+    console.error(e);
+    return json({ error: 'Server error - please try again' }, 500);
+  }
+}
+
+export const config = { path: '/api/*' };
