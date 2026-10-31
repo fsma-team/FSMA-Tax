@@ -16,6 +16,12 @@ var $$=function(s,r){return [].slice.call((r||document).querySelectorAll(s))};
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 function money(n){var neg=n<0;n=Math.abs(n);return (neg?"-":"")+"$"+n.toLocaleString("en-US")}
 function mdy(d){if(!d)return "";var p=d.split("-");return p[1]+"/"+p[2]+"/"+p[0]}
+function mdyShort(d){if(!d)return "";var p=d.split("-");return p[1]+"/"+p[2]+"/"+p[0].slice(2)}
+function parseMDY(v){v=String(v||"").trim();if(!v)return "";var m,mo,da,yr,cy=+todayISO().slice(0,4);
+  if(/[\/\-\.\s]/.test(v)){m=v.split(/[\/\-\.\s]+/);if(m.length<2)return null;mo=+m[0];da=+m[1];yr=m[2]?+m[2]:cy}
+  else{if(!/^\d+$/.test(v))return null;if(v.length===4){mo=+v.slice(0,2);da=+v.slice(2);yr=cy}else if(v.length===6){mo=+v.slice(0,2);da=+v.slice(2,4);yr=+v.slice(4)}else if(v.length===8){mo=+v.slice(0,2);da=+v.slice(2,4);yr=+v.slice(4)}else return null}
+  if(yr<100)yr+=2000;var d=new Date(Date.UTC(yr,mo-1,da));if(!mo||!da||d.getUTCMonth()!==mo-1||d.getUTCDate()!==da)return null;
+  return d.toISOString().slice(0,10)}
 function md(d){var p=d.split("-");return p[1]+"/"+p[2]}
 function todayISO(){return new Date().toLocaleDateString("en-CA",{timeZone:"America/Los_Angeles"})}
 function daysSince(d){return Math.floor((new Date(todayISO()+"T00:00:00")-new Date(d+"T00:00:00"))/864e5)}
@@ -80,7 +86,7 @@ function saveRow(tabKey,i,fields){
   }).catch(function(e){fail(e);if(e&&e.status===409)reloadRows()});
 }
 function reloadRows(){return api("GET","/rows").then(function(d){S.now=d.now;buildRows(d.rows);if(!uiBusy())render()}).catch(fail)}
-function uiBusy(){var ae=document.activeElement;return !!($("#modalHost")&&$("#modalHost").children.length)||!!(ae&&ae.closest&&ae.closest("table.sheet"))||!!(ae&&ae.id==="gq")}
+function uiBusy(){var ae=document.activeElement;return !!($("#modalHost")&&$("#modalHost").children.length)||!!(ae&&ae.closest&&ae.closest("table.sheet"))||!!(ae&&ae.id==="gq")||!!(ae&&ae.closest&&ae.closest("#page")&&/^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName))}
 
 /* ---------- login / password / boot ---------- */
 function showLogin(msg){
@@ -113,7 +119,7 @@ function loadBoot(){
     S.sched=b.sched;S.fees=b.fees;S.feeTiers=b.tiers.map(function(t){return [t[0],t[1],tierRows(t)]});S.now=b.now;buildRows(b.rows);
     S.bookings={};S.bkWeek=null;S.logLoaded=false;S.rec=null;
     if(!S.pYear){S.pYear=S.fy;applyPeriod()}
-    if(sById(S.page)===undefined&&["home","fees","appt","attn","reports","records","settings","search"].indexOf(S.page)<0)S.page="home";
+    if(sById(S.page)===undefined&&["home","fees","appt","attn","reports","acct","records","settings","search"].indexOf(S.page)<0)S.page="home";
     buildShell();render();startPolling();
   }).catch(function(e){if(e&&e.data&&e.data.must_change)showChangePw(true);else if(e.status!==401){$("#root").innerHTML='<div class="login"><div class="login-box"><h2>Không tải được dữ liệu</h2><div class="err">'+esc(e.message)+'</div><button class="btn" id="retry">Thử lại</button></div></div>';$("#retry").onclick=function(){location.reload()}}});
 }
@@ -144,8 +150,8 @@ function startPolling(){
     api("GET","/rows?since="+encodeURIComponent(since)).then(function(d){
       S.now=d.now;var list=d.rows.filter(function(o){return o.id!==skip});
       var changed=list.some(function(o){var loc=S.idx[o.id];if(o.deleted)return !!loc;var r=loc&&S.rows[loc[0]][loc[1]];return !r||JSON.stringify(mapRow(o))!==JSON.stringify(Object.assign({},r,{_q:undefined}))});
-      if(changed){applyChanges(list);if(!uiBusy())render()}
-      if(S.page==="appt"&&S.apptSub!=="Work Schedule"&&!uiBusy()){S.bkWeek=null;render()}
+      if(changed){applyChanges(list);if(!uiBusy()&&S.page!=="appt")renderKeep()}
+      if(S.page==="appt"&&S.apptSub!=="Work Schedule")refreshWeek();
     }).catch(function(){});
   },30000);
 }
@@ -153,7 +159,7 @@ function startPolling(){
 /* ================= nav ================= */
 function renderNav(){
   var items=[["home","Homepage"],["fees","Fees"],["appt","Appointment"],["attn","Attention"]];
-  if(isAdmin()){items.push(["reports","Reports"]);items.push(["records","Records"]);items.push(["settings","Settings"])}
+  if(isAdmin()){items.push(["reports","Reports"]);items.push(["acct","Accounting"]);items.push(["records","Records"]);items.push(["settings","Settings"])}
   $("#nav").innerHTML=items.map(function(x){return '<button data-p="'+x[0]+'" class="'+(S.page===x[0]?'on':'')+'">'+x[1]+'</button>'}).join("");
   $("#sheets").innerHTML=S.staff.map(function(s){return '<button class="st'+(S.page===s.id?' on':'')+'" data-p="'+s.id+'" style="--c:'+(PALETTE[s.theme.color])+'">'+esc(s.name)+'</button>'}).join("")+(isAdmin()?'<button class="st add" data-p="__add" title="Chỉ Admin">+ Thêm tab</button>':'');
   $$("[data-p]").forEach(function(b){b.onclick=function(){var k=b.getAttribute("data-p");if(k==="__add"){addStaff();return}S.page=k;render()}});
@@ -291,7 +297,9 @@ function pageReports(){
     T.cl+=v.cl;T.inc+=v.inc;T.tip+=v.tip;per.push(v)});
   var avg=function(a,b){return b?a/b:0},m2=function(n){return "$"+n.toFixed(2)};
   var mx=Math.max.apply(null,per.map(function(v){return avg(v.inc,v.cl)}).concat([1]));
-  var h='<div class="page-head"><div><h1>Reports</h1><div class="sub">Chỉ Admin thấy · trung bình mỗi hồ sơ (return)</div></div><div class="small">'+periodCtl()+'</div></div>';
+  var rsub='<div class="sub-tabs"><button class="btn'+(S.repSub!=="staff"?' on':'')+'" data-rsub="office">Office</button><button class="btn'+(S.repSub==="staff"?' on':'')+'" data-rsub="staff">Nhân viên</button></div>';
+  if(S.repSub==="staff")return '<div class="page-head"><div><h1>Reports</h1><div class="sub">Chỉ Admin thấy · mỗi người làm ra bao nhiêu mỗi giờ</div></div></div>'+rsub+pageRepStaff();
+  var h='<div class="page-head"><div><h1>Reports</h1><div class="sub">Chỉ Admin thấy · trung bình mỗi hồ sơ (return)</div></div><div class="small">'+periodCtl()+'</div></div>'+rsub;
   var np=per.filter(function(v){return v.cl>0}).length;
   h+='<div class="statbar" style="margin-bottom:26px"><div class="c"><b>'+T.cl+'</b><span>Total clients</span></div><div class="c"><b>'+money(T.inc)+'</b><span>Total Income</span></div><div class="c"><b>'+m2(avg(T.inc,T.cl))+'</b><span>Average per return (cả office)</span></div><div class="c"><b>'+Math.round(avg(T.cl,np))+'</b><span>Avg clients per preparer</span></div><div class="c"><b>'+money(Math.round(avg(T.inc,np)))+'</b><span>Avg income per preparer</span></div><div class="c"><b>'+m2(avg(T.tip,T.cl))+'</b><span>Average tip per client</span></div></div>';
   h+='<div class="card"><div class="card-head"><h2>Average per return – theo Preparer</h2></div><div class="wrap"><table class="t2"><tr><th>Preparer</th><th class="n">Clients</th><th class="n">Total Income</th><th class="n">Average per return</th><th style="width:30%"></th><th class="n">Tips</th><th class="n">Avg tip / client</th></tr>'+
@@ -433,20 +441,26 @@ function pageFees(){
   h+=subs;
   if(q){var hits=[];S.fees.forEach(function(g){g[1].forEach(function(r){if((r[0]+" "+r[2]).toLowerCase().indexOf(q)>=0)hits.push(r)})});
     h+='<div class="notice">'+(hits.length?hits.map(function(r){return '<b>'+esc(r[0])+'</b> → <b>'+esc(r[1])+'</b>'+(r[2]?' <span class="muted">('+esc(r[2])+')</span>':'')}).join('<br>'):'Không thấy mục nào khớp')+'</div>'}
-  var FC=["#43a047","#3d85c6","#8e63c9","#f08a24","#1fa3a3","#e0568a","#d4a017"],ci=0,pill=function(t){return '<span class="fpill">'+esc(t)+'</span>'};
+  var hit=function(r){return q&&(r[0]+" "+r[2]).toLowerCase().indexOf(q)>=0};
+  var item=function(r){return '<span class="fi'+(hit(r)?' hit':'')+'">'+esc(r[0])+(r[2]?' <small>· '+esc(r[2])+'</small>':'')+(/disclaimer/i.test(r[2])?' <a href="#" data-disc>Click here to view disclaimer</a>':'')+'</span>'};
+  var horiz=[];
   S.fees.forEach(function(g){
-    var col=FC[ci++%FC.length];
     if(g[0]==="EIC & CTC"){
-      var by={};g[1].forEach(function(r){by[r[0]]=r[1]});var v=function(n){return by[n]||"—"};
-      h+='<div class="card fcard" style="--fc:'+col+'"><div class="card-head"><h2>EIC &amp; CTC</h2></div><div class="wrap"><table class="t2 eicfee"><tr><th></th><th>Không con</th><th>1 con</th><th>2 con trở lên</th><th>+ CTC (bé dưới 17 tuổi)</th></tr><tr><td class="flab">EIC</td><td>'+pill(v("EIC – không con"))+'</td><td>'+pill(v("EIC – 1 con"))+'</td><td>'+pill(v("EIC – 2 con trở lên"))+'</td><td>'+pill(v("CTC – bé dưới 17 tuổi"))+'</td></tr></table></div></div>';
+      var by={};g[1].forEach(function(r){by[r[0]]=r[1]});var v=function(n){return esc(by[n]||"—")};
+      horiz.push('<div class="fsec"><h3>EIC &amp; CTC</h3><div class="wrap"><table class="xl"><tr><th></th><th>Không con</th><th>1 con</th><th>2 con trở lên</th><th>+ CTC (bé dưới 17 tuổi)</th></tr><tr><td>EIC</td><td>'+v("EIC – không con")+'</td><td>'+v("EIC – 1 con")+'</td><td>'+v("EIC – 2 con trở lên")+'</td><td>'+v("CTC – bé dưới 17 tuổi")+'</td></tr></table></div></div>');
       return;
     }
-    h+='<div class="card fcard" style="--fc:'+col+'"><div class="card-head"><h2>'+esc(g[0])+'</h2></div><table class="t2 rules"><tr><th style="width:200px">Fees</th><th>Áp dụng cho</th></tr>'+groupByFee(g[1]).map(function(x){
-      return '<tr><td>'+pill(x.fee)+'</td><td>'+x.items.map(function(r){var m=q&&(r[0]+" "+r[2]).toLowerCase().indexOf(q)>=0;return '<span class="chip'+(m?' hit':'')+'">'+esc(r[0])+(r[2]?' <small>· '+esc(r[2])+'</small>':'')+(/disclaimer/i.test(r[2])?' <a href="#" data-disc>Click here to view disclaimer</a>':'')+'</span>'}).join("")+'</td></tr>'}).join("")+'</table></div>'});
-  S.feeTiers.forEach(function(t){var rows=tierRows(t),col=FC[ci++%FC.length],n=t[1].length;
-    h+='<div class="card fcard" style="--fc:'+col+'"><div class="card-head"><h2>'+esc(t[0])+'</h2></div><div class="wrap"><table class="t2 tier"><tr><th>Income</th>'+t[1].map(function(c){return '<th>'+esc(c)+'</th>'}).join("")+'</tr>'+rows.map(function(r){
-      if(!r[1].length)return '<tr><td colspan="'+(n+1)+'" class="tnote">'+esc(r[0])+'</td></tr>';
-      return '<tr><td class="flab">'+esc(r[0])+'</td>'+r[1].map(function(c){return '<td>'+pill(c)+'</td>'}).join("")+'</tr>'}).join("")+'</table></div></div>'});
+    if(/^amendment/i.test(g[0])){
+      horiz.push('<div class="fsec"><h3>'+esc(g[0])+'</h3><div class="wrap"><table class="xl"><tr><th></th>'+g[1].map(function(r){return '<th'+(hit(r)?' class="hit"':'')+'>'+esc(r[0])+'</th>'}).join("")+'</tr><tr><td>Fees</td>'+g[1].map(function(r){return '<td>'+esc(r[1])+'</td>'}).join("")+'</tr></table></div></div>');
+      return;
+    }
+    h+='<div class="fsec"><h3>'+esc(g[0])+'</h3><table class="ft"><tr><th class="fee">Fees</th><th>Áp dụng cho</th></tr>'+groupByFee(g[1]).map(function(x){
+      return '<tr><td class="fee">'+esc(x.fee)+'</td><td>'+x.items.map(item).join('<span class="sep">, </span>')+'</td></tr>'}).join("")+'</table></div>'});
+  if(horiz.length)h+='<div class="fpair">'+horiz.join("")+'</div>';
+  S.feeTiers.forEach(function(t){var rows=tierRows(t),n=t[1].length,note="";
+    h+='<div class="fsec"><h3>'+esc(t[0])+'</h3><div class="wrap"><table class="xl"><tr><th>Income</th>'+t[1].map(function(c){return '<th>'+esc(c)+'</th>'}).join("")+'</tr>'+rows.map(function(r){
+      if(!r[1].length){note+='<div class="fnote">'+esc(r[0])+'</div>';return ''}
+      return '<tr><td>'+esc(r[0])+'</td>'+r[1].map(function(c){return '<td>'+esc(c)+'</td>'}).join("")+'</tr>'}).join("")+'</table></div>'+note+'</div>'});
   return h;
 }
 
@@ -471,14 +485,14 @@ function pageStaff(id){
   h+='<div class="banner"><div><h2 class="nm" style="font-family:\''+th.font+'\',cursive,sans-serif">'+esc(th.title)+'</h2><div class="tg">'+(th.tag?esc(th.tag):'<span class="muted">Chưa có lời nhắn · bấm Sửa banner để thêm</span>')+'</div><div style="margin-top:8px"><button class="btn sm" id="cust">Sửa banner</button></div></div>'+
     '<div class="statbar"><div class="c"><b id="st-cnt">0</b><span>Clients</span></div><div class="c"><b id="st-tot">$0</b><span>Total Income</span></div><div class="c"><b id="st-tip">$0</b><span>Tips</span></div><div class="c k-wait"><b id="st-wait">$0</b><span id="st-wl">Still waiting for Online files</span></div></div></div>';
   if(!can)h+='<div class="ro">Chỉ xem – bạn không có quyền sửa tab này</div>';
-  h+='<div class="wrap"><table class="sheet"><tr><th class="w1">Date</th><th class="n w1">Sum</th><th class="w1">Status</th><th>Name</th><th class="w1">SSN</th><th class="n w1">Tiền</th><th class="w1">Method</th><th class="w1">Online</th><th>Notes</th><th class="n w1">Tips</th>'+(can?'<th></th>':'')+'</tr>';
+  h+='<div class="wrap"><table class="sheet"><tr><th class="w1">Date</th><th class="n w1">Sum</th><th>Name</th><th class="w1">SSN</th><th class="w1">Status</th><th class="n w1">Tiền</th><th class="w1">Method</th><th class="w1">Online</th><th>Notes</th><th class="n w1">Tips</th>'+(can?'<th></th>':'')+'</tr>';
   rows.forEach(function(r,i){
     if(r.deleted)return;
     h+='<tr data-i="'+i+'">'+
-    '<td class="dt"><input type="date" data-f="date" value="'+r.date+'"'+dis+'></td><td class="sumc"></td>'+
-    '<td class="st2"><select data-f="status"'+dis+'>'+STATUS.map(function(o){return '<option value="'+o+'"'+(o===r.status?' selected':'')+'>'+(o||'—')+'</option>'}).join("")+'</select></td>'+
+    '<td class="dt"><input type="text" data-f="date" inputmode="numeric" maxlength="10" placeholder="mmddyy" value="'+mdyShort(r.date)+'"'+dis+'></td><td class="sumc"></td>'+
     '<td><input type="text" data-f="name" value="'+esc(r.name)+'"'+dis+'></td>'+
     '<td><input type="text" data-f="ssn" maxlength="4" inputmode="numeric" value="'+esc(r.ssn)+'" placeholder="4 số"'+dis+'></td>'+
+    '<td class="st2"><select data-f="status"'+dis+'>'+STATUS.map(function(o){return '<option value="'+o+'"'+(o===r.status?' selected':'')+'>'+(o||'—')+'</option>'}).join("")+'</select></td>'+
     '<td class="n"><input type="number" data-f="amt" value="'+(r.amt||'')+'" style="text-align:right"'+dis+'></td>'+
     '<td><select data-f="method"'+dis+'>'+METHODS.map(function(o){return '<option'+(o===r.method?' selected':'')+'>'+o+'</option>'}).join("")+'</select></td>'+
     '<td class="onc">'+onlineInner(r,!can)+'</td>'+
@@ -488,7 +502,7 @@ function pageStaff(id){
   });
   h+='</table></div>';
   if(can)h+='<p style="margin-top:14px"><button class="btn" id="addRows">+ 50 dòng</button> <span class="muted small">Gõ thẳng vào dòng trống, hết dòng thì bấm thêm</span></p>';
-  h+='<div class="legend">Dòng trống tự nhận ngày của dòng trên khi bạn gõ · Method mặc định Cash · tick Online để hiện E-sign và Paid · Online mà chưa Paid → tính vào Still waiting for Online files · SSN chỉ nhập 4 số cuối · 🔒 Accepted: mọi thay đổi và mọi lần xóa đều được ghi log cho Admin</div></div>';
+  h+='<div class="legend">Date gõ mmddyy (021527 = 02/15/27, gõ 4 số 0215 = năm nay) · Dòng trống tự nhận ngày của dòng trên khi bạn gõ · Method mặc định Cash · tick Online để hiện E-sign và Paid · Online mà chưa Paid → tính vào Still waiting for Online files · SSN chỉ nhập 4 số cuối · 🔒 Accepted: mọi thay đổi và mọi lần xóa đều được ghi log cho Admin</div></div>';
   return h;
 }
 var FIELD_LABEL={date:"Date",status:"Status",name:"Name",ssn:"SSN",amt:"Tiền",method:"Method",online:"Online",esign:"E-sign",paid:"Paid",note:"Notes",tip:"Tips"};
@@ -501,6 +515,7 @@ function bindStaff(id){
     var el=e.target,f=el.getAttribute("data-f");if(!f)return;
     var tr=el.closest("tr"),i=+tr.getAttribute("data-i"),r=rows[i],old=r[f],v;
     if(el.type==="checkbox")v=el.checked;else if(el.type==="number")v=parseFloat(el.value)||0;else v=el.value;
+    if(f==="date"){v=parseMDY(v);if(v===null){toast("Date gõ mmddyy, ví dụ 021527 = 02/15/27",true);el.value=mdyShort(old);return}el.value=mdyShort(v)}
     if(f==="name")v=titleCase(v);
     if(f==="ssn"&&!/^\d{0,4}$/.test(v)){toast("SSN chỉ nhập đúng 4 số cuối.",true);el.value=old;return}
     if(old===v)return;
@@ -509,7 +524,7 @@ function bindStaff(id){
     if(f==="paid")r.paidDate=v?todayISO():"";
     if(f==="online"&&!v){r.esign=false;r.paid=false;r.paidDate="";fields.esign=false;fields.paid=false}
     if(!r.date&&v&&(f==="name"||f==="amt"||f==="status")){var d="";for(var k=i-1;k>=0;k--){if(rows[k].date){d=rows[k].date;break}}r.date=d||todayISO();fields.date=r.date}
-    tr.querySelector('[data-f="date"]').value=r.date;
+    tr.querySelector('[data-f="date"]').value=mdyShort(r.date);
     if(f==="name")el.value=r.name;
     if(f==="online"||f==="esign"||f==="paid"){tr.querySelector("td.onc").innerHTML=onlineInner(r,false);var again=tr.querySelector('td.onc [data-f="'+f+'"]');if(again)again.focus()}
     var ac=tr.querySelector("td.act");if(ac)ac.innerHTML=actInner(i,r,true);
@@ -541,7 +556,20 @@ function openCustomize(id){
 /* ================= Appointment: actions ================= */
 function coverMap(who,d,except){var slots=slotsFor(who),cov={};Object.keys(S.bookings).forEach(function(k){var p=k.split("|");if(p[0]!==who||p[1]!==d||k===except)return;var si=slots.indexOf(toMin(p[2]));if(si<0)return;var sp=Math.max(1,S.bookings[k].span||1);for(var i=si;i<si+sp&&i<slots.length;i++)cov[i]=k});return cov}
 function canPlace(who,d,time,span,except){if(colInfo(who,d))return "Ngày đó đang nghỉ.";var slots=slotsFor(who),si=slots.indexOf(toMin(time));if(si<0)return "Giờ đó không có trong lịch.";if(si+span>slots.length)return "Không đủ chỗ ở khung giờ đó.";var cov=coverMap(who,d,except);for(var i=si;i<si+span;i++)if(cov[i])return "Không đủ chỗ ở khung giờ đó.";return ""}
-function reloadWeek(){S.bkWeek=null;render()}
+function renderKeep(){var y=window.scrollY,x=window.scrollX,w=$(".week")&&$(".week").parentNode,wl=w?w.scrollLeft:0;render();window.scrollTo(x,y);var w2=$(".week")&&$(".week").parentNode;if(w2)w2.scrollLeft=wl}
+function bkSnap(wk){var o={};Object.keys(S.bookings).forEach(function(k){var d=k.split("|")[1];if(d>=wk&&d<=addDays(wk,6))o[k]=S.bookings[k]});return JSON.stringify(o)}
+var _wkReq=0;
+function refreshWeek(){var wk=S.weekStart,me=++_wkReq;
+  return api("GET","/bookings?from="+wk+"&to="+addDays(wk,6)).then(function(list){if(me!==_wkReq)return;
+    var before=bkSnap(wk);
+    Object.keys(S.bookings).forEach(function(k){var d=k.split("|")[1];if(d>=wk&&d<=addDays(wk,6))delete S.bookings[k]});
+    list.forEach(function(b){S.bookings[b.cal+"|"+b.date+"|"+b.slot]={n:b.n,p:b.p,f:b.f,s:b.s,note:b.note,span:b.span,id:b.id}});
+    S.bkWeek=wk;
+    if(bkSnap(wk)!==before&&S.page==="appt"&&S.apptSub!=="Work Schedule"&&S.weekStart===wk&&!uiBusy()&&!S._dk)renderKeep();
+  }).catch(function(){})}
+function reloadWeek(){return refreshWeek()}
+/* optimistic: show the change now, save in the background, re-sync on error */
+function localMove(ok,nk,nb){if(ok&&ok!==nk)delete S.bookings[ok];S.bookings[nk]=nb;renderKeep()}
 function apiSaveBooking(cal,day,slot,b,old){
   return api("POST","/bookings/save",{cal:cal,day:day,slot:slot,client:b.n,phone:b.p,files:b.f,preparer:b.s||"",note:b.note||"",span:b.span||1,old:old||null});
 }
@@ -549,6 +577,7 @@ function moveBooking(ok,nk){
   var bk=S.bookings[ok],o=ok.split("|"),n=nk.split("|");if(!bk||o[0]!==n[0])return;
   var er=canPlace(n[0],n[1],n[2],Math.max(1,bk.span||1),ok);if(er){toast(er,true);return}
   if(bk.s&&!availPrep(bk.s,n[1],n[2])&&!confirm(bk.s+" không có lịch đi làm vào giờ này. Vẫn chuyển hẹn sang giờ này?"))return;
+  localMove(ok,nk,Object.assign({},bk));
   apiSaveBooking(n[0],n[1],n[2],bk,{cal:o[0],day:o[1],slot:o[2]}).then(reloadWeek).catch(function(e){fail(e);reloadWeek()});
 }
 function bindAppt(){
@@ -576,9 +605,11 @@ function bindAppt(){
         for(var i=si0+1;i<=target;i++){var c=rows[i].querySelector('td[data-k="'+who+'|'+d+'|'+hm(slots[i])+'"]');if(c)c.classList.add("pre")}};
       z.onpointerup=function(){S._drag=Date.now();var last=si0;
         for(var i=si0+1;i<=target;i++){if(S.bookings[who+"|"+d+"|"+hm(slots[i])])break;last=i}
-        var nb=Object.assign({},bk,{span:last-si0+1});
+        var nb=Object.assign({},bk,{span:last-si0+1});clr();
+        if((bk.span||1)===nb.span){td.draggable=true;return}
+        localMove(key,key,nb);
         apiSaveBooking(who,d,p[2],nb,{cal:who,day:d,slot:p[2]}).then(reloadWeek).catch(function(e2){fail(e2);reloadWeek()})};
-      z.onpointercancel=function(){render()};
+      z.onpointercancel=function(){clr();td.draggable=true};
     }});
 }
 function openBooking(k,p){
@@ -593,14 +624,15 @@ function openBooking(k,p){
     '</div><div class="err" id="berr"></div><div class="row-end">'+(ex?'<button class="btn del" id="bdel">Xóa hẹn</button>':'')+'<button class="btn" id="bc">Hủy</button><button class="btn pri" id="bsv">Lưu</button></div></div></div>';
   $("#bc").onclick=function(){m.innerHTML=""};
   if($("#bs")){var dimSel=function(){var o=$("#bs").selectedOptions[0];$("#bs").style.color=o&&o.classList.contains("dim")?"#aaa":""};$("#bs").onchange=dimSel;dimSel()}
-  if($("#bdel"))$("#bdel").onclick=function(){api("DELETE","/bookings?cal="+p[0]+"&day="+p[1]+"&slot="+p[2]).then(function(){m.innerHTML="";reloadWeek()}).catch(fail)};
+  if($("#bdel"))$("#bdel").onclick=function(){api("DELETE","/bookings?cal="+p[0]+"&day="+p[1]+"&slot="+p[2]).then(function(){m.innerHTML="";delete S.bookings[k];renderKeep();reloadWeek()}).catch(fail)};
   $("#bsv").onclick=function(){var n=$("#bn").value.trim(),ph=$("#bp").value.trim(),f=parseInt($("#bf").value,10);
     if(!n||!ph||!(f>0)){$("#berr").textContent="Cần điền Client name, Phone và Files.";return}
     var nd=$("#bdt")?$("#bdt").value:p[1],nt=$("#btm")?$("#btm").value:p[2],nk=p[0]+"|"+nd+"|"+nt,sp=$("#bs")?$("#bs").value:"";
     var nb={n:titleCase(n),p:ph,f:f,s:sp,note:$("#bnote").value.trim(),span:b.span||1};
     if(nk!==k){var er=canPlace(p[0],nd,nt,nb.span,k);if(er){$("#berr").textContent=er;return}}
     if(sp&&!availPrep(sp,nd,nt)&&!confirm(sp+" không có lịch đi làm vào giờ này. Vẫn đặt hẹn cho "+sp+"?"))return;
-    apiSaveBooking(p[0],nd,nt,nb,ex?{cal:p[0],day:p[1],slot:p[2]}:null).then(function(){m.innerHTML="";reloadWeek()}).catch(function(e){$("#berr").textContent=e.message})};
+    var bsv=$("#bsv");bsv.disabled=true;
+    apiSaveBooking(p[0],nd,nt,nb,ex?{cal:p[0],day:p[1],slot:p[2]}:null).then(function(b){m.innerHTML="";nb.id=b&&b.id;localMove(ex?k:null,nk,nb);reloadWeek()}).catch(function(e){bsv.disabled=false;$("#berr").textContent=e.message})};
 }
 
 
@@ -608,7 +640,7 @@ function hm(m){return ("0"+Math.floor(m/60)).slice(-2)+":"+("0"+(m%60)).slice(-2
 function toMin(t){var p=t.split(":");return +p[0]*60+ +p[1]}
 function addDays(d,n){var x=new Date(d+"T00:00:00");x.setDate(x.getDate()+n);return x.toISOString().slice(0,10)}
 function slotsFor(who){var c=S.cal[who],a=[];for(var m=toMin(c.start);m<=toMin(c.last);m+=c.step)a.push(m);return a}
-function isClosed(date,slot,who){var h=S.hours[new Date(date+"T00:00:00").getDay()];if(!h)return true;if(who!=="Office")return false;return slot<toMin(h[0])||slot>=toMin(h[1])}
+function isClosed(date,slot,who){var h=S.hours[new Date(date+"T00:00:00").getDay()];if(!h)return true;if(who!=="Office")return false;return slot<toMin(h[0])||slot>toMin(h[1])}
 function blackoutFor(d,who){return S.blackouts.filter(function(b){return b.date===d&&(b.who==="all"||b.who===who)})[0]}
 function dayKey(d){return ["sun","mon","tue","wed","thu","fri","sat"][new Date(d+"T00:00:00").getDay()]}
 function findPeriod(d){return S.sched.filter(function(p){return d>=p.start&&d<=p.end})[0]}
@@ -679,7 +711,7 @@ function pageSettings(){
     S.staff.map(function(s,i){return '<tr><td><button class="btn sm" data-up="'+i+'">↑</button> <button class="btn sm" data-dn="'+i+'">↓</button></td><td><input type="text" data-sn="'+i+'" value="'+esc(s.name)+'" style="width:130px"></td><td><span class="sw" style="background:'+PALETTE[s.theme.color]+';cursor:default"></span> '+s.theme.color+'</td><td>'+esc(s.theme.title)+'</td><td class="n">'+live(s.id).length+'</td><td><button class="btn sm del" data-sx="'+i+'">Xóa tab</button></td></tr>'}).join("")+'</table></div><p><button class="btn pri" id="addS">+ Thêm tab nhân viên</button> <span class="muted small">Xóa tab = ẩn tab, dữ liệu vẫn còn trong database.</span></p>';
   }
   if(S.setSub==="appt"){
-    h+='<div class="grid2"><div><h3>Giờ làm việc</h3><table class="t2"><tr><th>Ngày</th><th>Mở</th><th>Đóng</th><th>Nghỉ</th></tr>'+
+    h+='<div class="grid2"><div><h3>Giờ nhận hẹn Office</h3><table class="t2"><tr><th>Ngày</th><th>Từ</th><th>Hẹn cuối</th><th>Nghỉ</th></tr>'+
     [[1,"Thứ 2"],[2,"Thứ 3"],[3,"Thứ 4"],[4,"Thứ 5"],[5,"Thứ 6"],[6,"Thứ 7"],[0,"Chủ nhật"]].map(function(d){var x=S.hours[d[0]];return '<tr><td>'+d[1]+'</td><td><input type="time" data-ho="'+d[0]+'" value="'+(x?x[0]:"09:00")+'"'+(x?'':' disabled')+'></td><td><input type="time" data-hc="'+d[0]+'" value="'+(x?x[1]:"18:00")+'"'+(x?'':' disabled')+'></td><td><input type="checkbox" data-hx="'+d[0]+'"'+(x?'':' checked')+'></td></tr>'}).join("")+'</table></div>'+
     '<div><h3>Blackout</h3><table class="t2"><tr><th>Ngày</th><th>Áp dụng</th><th>Ghi chú</th><th></th></tr>'+S.blackouts.map(function(b){return '<tr><td>'+mdy(b.date)+'</td><td>'+(b.who==="all"?"Tất cả":b.who)+'</td><td>'+esc(b.note)+'</td><td><button class="btn sm del" data-bx="'+b.id+'">×</button></td></tr>'}).join("")+'</table><p><input type="date" id="bd"> <select id="bw"><option value="all">Tất cả</option><option>Office</option><option>Daniel</option><option>Peter</option></select> <input type="text" id="bnt" placeholder="Ghi chú" style="width:130px"> <button class="btn pri" id="bad">Thêm</button></p></div></div>'+
     '<h3 style="margin-top:22px">Giờ từng lịch</h3><table class="t2" style="max-width:560px"><tr><th>Lịch</th><th>Slot đầu</th><th>Hẹn cuối</th><th>Mỗi slot</th></tr>'+["Office","Daniel","Peter"].map(function(w){var c=S.cal[w];return '<tr><td>'+w+'</td><td><input type="time" data-cs="'+w+'" value="'+c.start+'"></td><td><input type="time" data-ce="'+w+'" value="'+c.last+'"></td><td><select data-cl="'+w+'"><option value="30"'+(c.step===30?' selected':'')+'>30 phút</option><option value="60"'+(c.step===60?' selected':'')+'>1 giờ</option></select></td></tr>'}).join("")+'</table>'+
@@ -778,8 +810,8 @@ function loadLog(){api("GET","/log").then(function(l){S.log=l;S.logLoaded=true;i
 /* ================= render ================= */
 function render(){
   if(!S.me)return;
-  if(!isAdmin()&&(S.page==="settings"||S.page==="reports"||S.page==="records"))S.page="home";
-  if(!sById(S.page)&&["home","fees","appt","attn","reports","records","settings","search"].indexOf(S.page)<0)S.page="home";
+  if(!isAdmin()&&(S.page==="settings"||S.page==="reports"||S.page==="records"||S.page==="acct"))S.page="home";
+  if(!sById(S.page)&&["home","fees","appt","attn","reports","acct","records","settings","search"].indexOf(S.page)<0)S.page="home";
   renderNav();
   var p=S.page,pg=$("#page"),h;
   pg.className="page"+((p==="appt"||sById(p)||p==="attn"||p==="records"||p==="search")?" wide":"");
@@ -802,13 +834,14 @@ function render(){
     return;
   }
   if(p==="settings"&&S.setSub==="log"&&!S.logLoaded)loadLog();
-  if(p==="home")h=pageHome();else if(p==="fees")h=pageFees();else if(p==="appt")h=pageAppt();else if(p==="attn")h=pageAttn();else if(p==="reports")h=pageReports();else if(p==="records")h=pageRecords();else if(p==="search")h=pageSearch();else if(p==="settings")h=pageSettings();else h=pageStaff(p);
+  if(p==="home")h=pageHome();else if(p==="fees")h=pageFees();else if(p==="appt")h=pageAppt();else if(p==="attn")h=pageAttn();else if(p==="reports")h=pageReports();else if(p==="acct")h=pageAcct();else if(p==="records")h=pageRecords();else if(p==="search")h=pageSearch();else if(p==="settings")h=pageSettings();else h=pageStaff(p);
   pg.innerHTML=h;
   if(p==="appt")bindAppt();
   if(p==="settings")bindSettings();
   if(p==="records")bindRecords();
   if(p==="search"){$("#sBack").onclick=function(){S.page=S.prev||"home";$("#gq").value="";render()};$$("[data-go]").forEach(function(a){a.onclick=function(e){e.preventDefault();S.page=a.getAttribute("data-go");render()}})}
-  if(p==="reports")bindPeriod();
+  if(p==="reports"){$$("[data-rsub]").forEach(function(b){b.onclick=function(){S.repSub=b.getAttribute("data-rsub");render()}});if(S.repSub==="staff")bindRepStaff();else bindPeriod()}
+  if(p==="acct")bindAcct();
   if(sById(p))bindStaff(p);
   if(p==="fees"){
     $$("[data-fsub]").forEach(function(b){b.onclick=function(){S.feeSub=b.getAttribute("data-fsub");render()}});

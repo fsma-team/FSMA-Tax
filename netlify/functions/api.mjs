@@ -547,6 +547,80 @@ async function listLog() {
   return rows.map((r) => ({ id: Number(r.id), at: r.at, user: r.user_name, tab: r.tab_name, kind: r.kind, text: r.text, restored: r.restored === 'true' }));
 }
 
+
+// ---------- accounting (Admin) ----------
+const nnum = (v, o) => (v === null || v === undefined || v === '' ? null : num(v, o));
+const n2 = (v) => (v === null || v === undefined ? null : Number(v));
+const payStaffOut = (r) => ({ id: r.id, name: r.name, rate: Number(r.rate), note: r.note, tab_id: r.tab_id, active: r.active, sort: r.sort });
+const periodOut = (p) => ({ id: p.id, start: p.start_date, end: p.end_date });
+async function getAcct() {
+  const sql = db();
+  const cash = await sql`select day, tab_id, received, done, note, updated_by, updated_at from cash_days order by day desc, tab_id`;
+  const staff = await sql`select * from pay_staff order by sort, id`;
+  const periods = await sql`select * from pay_periods order by start_date, id`;
+  const rows = await sql`select * from pay_rows`;
+  return {
+    cash: cash.map((c) => ({ day: c.day, tab_id: c.tab_id, received: n2(c.received), done: c.done, note: c.note, by: c.updated_by, at: c.updated_at })),
+    staff: staff.map(payStaffOut),
+    periods: periods.map(periodOut),
+    rows: rows.map((r) => ({ period_id: r.period_id, staff_id: r.staff_id, hours: n2(r.hours), wages: n2(r.wages), bonus: n2(r.bonus), note: r.note })),
+  };
+}
+async function putCash(user, body) {
+  const day = isoDate(body.day); const tab = Number(body.tab_id);
+  if (!day || !Number.isInteger(tab)) throw new HttpError(400, 'Bad request');
+  const received = nnum(body.received, { min: -1e6, max: 1e6 });
+  const done = bool(body.done); const note = String(body.note ?? '').slice(0, 300);
+  const [r] = await db()`insert into cash_days (day, tab_id, received, done, note, updated_by, updated_at)
+    values (${day}, ${tab}, ${received}, ${done}, ${note}, ${user.display_name}, now())
+    on conflict (day, tab_id) do update set received=excluded.received, done=excluded.done, note=excluded.note, updated_by=excluded.updated_by, updated_at=now()
+    returning *`;
+  return { day: r.day, tab_id: r.tab_id, received: n2(r.received), done: r.done, note: r.note, by: r.updated_by, at: r.updated_at };
+}
+async function addPayStaff(body) {
+  const name = s(body.name, 40); if (!name) throw new HttpError(400, 'Cần tên nhân viên');
+  const [mx] = await db()`select coalesce(max(sort),0)::int as m from pay_staff`;
+  try {
+    const [r] = await db()`insert into pay_staff (name, rate, sort) values (${name}, ${num(body.rate, { min: 0, max: 1000 })}, ${mx.m + 1}) returning *`;
+    return payStaffOut(r);
+  } catch (e) { if (e.code === '23505') throw new HttpError(400, 'Tên này đã có'); throw e; }
+}
+async function updPayStaff(id, body) {
+  const sql = db();
+  const [cur] = await sql`select * from pay_staff where id=${id}`; if (!cur) throw new HttpError(404, 'Not found');
+  const name = 'name' in body ? s(body.name, 40) : cur.name; if (!name) throw new HttpError(400, 'Cần tên nhân viên');
+  const rate = 'rate' in body ? num(body.rate, { min: 0, max: 1000 }) : cur.rate;
+  const note = 'note' in body ? String(body.note ?? '').slice(0, 200) : cur.note;
+  const tab = 'tab_id' in body ? (body.tab_id ? Number(body.tab_id) : null) : cur.tab_id;
+  const active = 'active' in body ? bool(body.active) : cur.active;
+  try {
+    const [r] = await sql`update pay_staff set name=${name}, rate=${rate}, note=${note}, tab_id=${tab}, active=${active} where id=${id} returning *`;
+    return payStaffOut(r);
+  } catch (e) { if (e.code === '23505') throw new HttpError(400, 'Tên này đã có'); throw e; }
+}
+async function addPeriod(body) {
+  const a = isoDate(body.start), b = isoDate(body.end);
+  if (!a || !b || b < a) throw new HttpError(400, 'Period: ngày cuối phải sau ngày đầu');
+  const [p] = await db()`insert into pay_periods (start_date, end_date) values (${a}, ${b}) returning *`;
+  return periodOut(p);
+}
+async function updPeriod(id, body) {
+  const a = isoDate(body.start), b = isoDate(body.end);
+  if (!a || !b || b < a) throw new HttpError(400, 'Period: ngày cuối phải sau ngày đầu');
+  const [p] = await db()`update pay_periods set start_date=${a}, end_date=${b} where id=${id} returning *`;
+  if (!p) throw new HttpError(404, 'Not found');
+  return periodOut(p);
+}
+async function putPayRow(body) {
+  const pid = Number(body.period_id), sid = Number(body.staff_id);
+  if (!Number.isInteger(pid) || !Number.isInteger(sid)) throw new HttpError(400, 'Bad request');
+  const hours = nnum(body.hours, { min: 0, max: 1000 }), wages = nnum(body.wages, { min: 0, max: 1e6 }), bonus = nnum(body.bonus, { min: 0, max: 1e6 });
+  const note = String(body.note ?? '').slice(0, 200);
+  const [r] = await db()`insert into pay_rows (period_id, staff_id, hours, wages, bonus, note) values (${pid}, ${sid}, ${hours}, ${wages}, ${bonus}, ${note})
+    on conflict (period_id, staff_id) do update set hours=excluded.hours, wages=excluded.wages, bonus=excluded.bonus, note=excluded.note returning *`;
+  return { period_id: r.period_id, staff_id: r.staff_id, hours: n2(r.hours), wages: n2(r.wages), bonus: n2(r.bonus), note: r.note };
+}
+
 // ---------- backup (Admin) ----------
 async function backup() {
   const sql = db();
@@ -560,7 +634,8 @@ async function backup() {
   const bookings = await sql`select * from bookings order by day, slot`;
   const sched = await getSched(sql);
   const fees = await getFees(sql);
-  const body = JSON.stringify({ exported_at: new Date().toISOString(), staff_tabs: tabs, users, rows, activity_log: log, settings, blackouts, bookings, schedule: sched, fees: fees.fees, fee_tiers: fees.tiers });
+  const acct = await getAcct().catch(() => null);
+  const body = JSON.stringify({ exported_at: new Date().toISOString(), staff_tabs: tabs, users, rows, activity_log: log, settings, blackouts, bookings, schedule: sched, fees: fees.fees, fee_tiers: fees.tiers, accounting: acct });
   return new Response(body, { status: 200, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'content-disposition': `attachment; filename="tax-backup-${todayLA()}.json"` } });
 }
 
@@ -632,6 +707,14 @@ const routes = [
   ['GET', '/records/daily', async (x) => { requireAdmin(x.user); return recordsDaily(); }],
   ['GET', '/records/clients', async (x) => { requireAdmin(x.user); return recordsClients(x.url); }],
   ['GET', '/backup', async (x) => { requireAdmin(x.user); return backup(); }],
+  ['GET', '/acct', async (x) => { requireAdmin(x.user); return getAcct(); }],
+  ['PUT', '/cash', async (x) => { requireAdmin(x.user); return putCash(x.user, x.body); }],
+  ['POST', '/pay/staff', async (x) => { requireAdmin(x.user); return addPayStaff(x.body); }],
+  ['PATCH', '/pay/staff/:id', async (x) => { requireAdmin(x.user); return updPayStaff(Number(x.id), x.body); }],
+  ['POST', '/pay/periods', async (x) => { requireAdmin(x.user); return addPeriod(x.body); }],
+  ['PATCH', '/pay/periods/:id', async (x) => { requireAdmin(x.user); return updPeriod(Number(x.id), x.body); }],
+  ['DELETE', '/pay/periods/:id', async (x) => { requireAdmin(x.user); await db()`delete from pay_periods where id=${Number(x.id)}`; return { ok: true }; }],
+  ['PUT', '/pay/rows', async (x) => { requireAdmin(x.user); return putPayRow(x.body); }],
   ['GET', '/log', async (x) => { requireAdmin(x.user); return listLog(); }],
   ['POST', '/log/:id/restore', async (x) => { requireAdmin(x.user); return restoreRow(x.user, x.id); }],
 ].map(([method, pattern, fn]) => {

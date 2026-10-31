@@ -15,6 +15,7 @@ Netlify (web + server) + Supabase (database) + GitHub (code), giống pb.fsma.te
 | 2 | `02-seed.sql` | Tab nhân viên, 8 user (mật khẩu tạm **12345**), fees, lịch đi làm, settings |
 | 3 | `03-records-2021.sql` … `03-records-2025.sql` | Hồ sơ từng khách 2021–2025 (khoảng 19.000 dòng, chỉ 4 số SSN cuối) |
 | 4 | `04-records-daily.sql` | Số tổng theo ngày cho Records > Summary / Report |
+| 4b | `06-accounting.sql` | Tab Accounting (Cash cuối ngày, Lương) và giờ Office nhận hẹn tới 18:00 |
 | 5 | `05-fees-update.sql` | Chỉ chạy khi đã chạy `02-seed.sql` từ bản cũ: thay toàn bộ bảng Fees bằng giá mới (sẽ ghi đè giá bạn đã sửa) |
 
    Các file `03-...` khá lớn (300–380 KB). Nếu SQL Editor báo quá lớn hoặc bị đứng, chạy từ máy tính bằng Node (xem mục "Chạy file SQL lớn" bên dưới).
@@ -55,6 +56,11 @@ Thêm/sửa user, reset mật khẩu (về 12345), mở khóa: Settings > Users.
 - **Preparer**: sửa tab của mình, đặt hẹn, xem mọi tab (chỉ đọc), tìm khách (mọi năm, mọi preparer), sửa banner của mọi tab.
 - Hồ sơ đã **Accepted**: mọi thay đổi và mọi lần xóa hồ sơ đều ghi vào Activity log (Admin xem, có nút Khôi phục).
 
+
+## Accounting (chỉ Admin)
+- **Cash cuối ngày**: Cash / Check / Zelle / Venmo của từng preparer lấy từ tab hồ sơ (hồ sơ Online chỉ tính khi đã tick Paid, theo ngày Paid). Admin gõ Cash thực nhận, lệch thì hiện đỏ.
+- **Lương**: mỗi period ghi 1 lần; Hours, Wages, Bonus, Total paid, Note cho từng người. Wages tự tính = Rate × 80 giờ đầu + Rate × 1.5 × giờ trên 80 (sửa tay được). Bấm tên để sửa Rate, tab hồ sơ, đang làm / nghỉ.
+- **Reports > Nhân viên**: giờ làm, giờ/tuần, clients/giờ, income/giờ, lương % income theo period hoặc cả mùa.
 
 ## Tab Fees > EIC fee estimate
 Chọn Filing status, số con, tuổi và thu nhập để ra Federal EIC, CalEITC và phí EIC (lấy từ mục "EIC – Single / 1 con / 2 con trở lên" trong bảng Fees, sửa ở Settings > Fees). Công thức và bảng CalEITC lấy từ file Tax Tools, đối chiếu 20.000 trường hợp ngẫu nhiên đều khớp. Số liệu là **năm thuế 2025**; mùa sau cập nhật các hằng số ở đầu file `public/js/eic.js` (FED, CA, CAL_T).
