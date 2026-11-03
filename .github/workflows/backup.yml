@@ -1,0 +1,40 @@
+# Sao lưu database Supabase mỗi ngày (3:17 sáng giờ California).
+# File backup nằm ở GitHub > Actions > Daily database backup > chọn 1 lần chạy > Artifacts. Giữ 30 ngày.
+# Cần 1 secret: SUPABASE_DB_URL = Session pooler URI (cổng 5432), xem README.
+name: Daily database backup
+on:
+  schedule:
+    - cron: '17 10 * * *'   # 10:17 UTC = 3:17 AM PDT / 2:17 AM PST
+  workflow_dispatch: {}       # nút "Run workflow" để chạy tay
+permissions:
+  contents: read
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Install pg_dump 17
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+      - name: Dump database
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$DB_URL" ]; then echo "Chưa có secret SUPABASE_DB_URL"; exit 1; fi
+          F="tax-backup-$(TZ=America/Los_Angeles date +%Y-%m-%d).sql.gz"
+          /usr/lib/postgresql/17/bin/pg_dump "$DB_URL" --schema=public --no-owner --no-privileges | gzip -9 > "$F"
+          SIZE=$(stat -c %s "$F")
+          echo "Backup $F: $SIZE bytes"
+          if [ "$SIZE" -lt 2000 ]; then echo "File backup quá nhỏ, có lỗi"; exit 1; fi
+          echo "FILE=$F" >> "$GITHUB_ENV"
+      - name: Save backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.FILE }}
+          path: ${{ env.FILE }}
+          retention-days: 30
+          compression-level: 0
