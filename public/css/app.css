@@ -283,3 +283,12 @@ table.pay .otn{font-size:11px;color:var(--orange-ink);margin-right:6px}
 .week td.c .bx{position:absolute;top:1px;right:1px;width:17px;height:17px;line-height:15px;padding:0;border:1px solid transparent;border-radius:3px;background:transparent;color:var(--red-ink);font-size:14px;font-weight:700;cursor:pointer;opacity:.55;z-index:2}
 .week td.c .bx:hover{opacity:1;background:var(--panel);border-color:var(--red)}
 .week td.bk{padding-right:18px}
+
+/* compact staff sheet: more rows on screen */
+.sheet td{padding:0 4px;font-size:13.5px;line-height:1.25;height:27px}
+.sheet td input,.sheet td select{padding:1px 4px;font-size:13.5px;height:24px}
+.sheet td.onc{padding-top:3px;padding-bottom:2px}
+.onl{gap:0;font-size:12.5px;line-height:1.2}
+.onl input[type=checkbox]{width:13px;height:13px;margin:0}
+.onl .sub{flex-direction:row;gap:10px;margin-left:3px;padding-left:6px;font-size:12px}
+.sheet td.act .btn.sm{padding:0 6px;line-height:18px}

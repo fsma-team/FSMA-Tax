@@ -65,6 +65,14 @@ Thêm/sửa user, reset mật khẩu (về 12345), mở khóa: Settings > Users.
 ## Tab Fees > EIC fee estimate
 Chọn Filing status, số con, tuổi và thu nhập để ra Federal EIC, CalEITC và phí EIC (lấy từ mục "EIC – Single / 1 con / 2 con trở lên" trong bảng Fees, sửa ở Settings > Fees). Công thức và bảng CalEITC lấy từ file Tax Tools, đối chiếu 20.000 trường hợp ngẫu nhiên đều khớp. Số liệu là **năm thuế 2025**; mùa sau cập nhật các hằng số ở đầu file `public/js/eic.js` (FED, CA, CAL_T).
 
+## Backup tự động mỗi ngày (GitHub Actions)
+File `.github/workflows/backup.yml` sao lưu toàn bộ database Supabase mỗi ngày lúc khoảng 3 giờ sáng (giờ California), giữ 30 ngày.
+1. Supabase > **Connect** > Connection String > mục **Session pooler** (cổng **5432**, không phải 6543) > copy URI, thay `[YOUR-PASSWORD]` bằng database password.
+2. GitHub repo > **Settings > Secrets and variables > Actions > New repository secret**: Name `SUPABASE_DB_URL`, Secret là dòng URI ở bước 1.
+3. GitHub > **Actions** > **Daily database backup** > **Run workflow** để chạy thử. Xanh lá là được.
+4. Lấy file: bấm vào 1 lần chạy > mục **Artifacts** > tải `tax-backup-YYYY-MM-DD.sql.gz`. File có tên khách, giữ kín.
+Khôi phục (khi cần): nhờ Claude, hoặc tạo project Supabase mới rồi chạy `gunzip -c tax-backup-....sql.gz | psql "<URI>"`.
+
 ## Dữ liệu và bảo mật
 - Chỉ lưu **4 số cuối SSN**; server từ chối nếu nhập nhiều hơn 4 số. Không lưu thông tin ngân hàng; số điện thoại và số tài khoản trong Note của các năm cũ đã được che `***`.
 - Mật khẩu lưu dạng mã hóa (bcrypt). Cookie đăng nhập HttpOnly, Secure, SameSite=Strict, hết hạn sau 12 giờ hoặc 45 phút không dùng (tab bỏ mặc 30 phút thì không còn tự cập nhật).

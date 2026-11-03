@@ -253,7 +253,7 @@ function pageHome(){
   h+='<div class="notice"><b>Thông báo:</b> '+esc(S.notice)+(isAdmin()?' &nbsp;<a href="#" id="editNotice">sửa</a>':'')+'</div>';
   var wait=0,n=0,tc=0,tt=0;allRows().forEach(function(x){if(bucket(x.r)==="wt"){wait+=x.r.amt;n++}if(x.r.status!=="Refund"&&x.r.name)tc++;tt+=amt(x.r)});
   var a=attn();
-  h+='<div class="statbar" style="margin-bottom:28px"><div class="c"><b>'+tc+'</b><span>Total clients</span></div><div class="c"><b>'+money(tt)+'</b><span>Total Income</span></div><div class="c k-wait"><b>'+money(wait)+'</b><span>Still waiting for Online files · '+n+' files</span></div><div class="c k-att" id="goAttn"><b>'+a.total+' files</b><span>Attention · bấm để xem</span></div></div>';
+  if(isAdmin())h+='<div class="statbar" style="margin-bottom:28px"><div class="c"><b>'+tc+'</b><span>Total clients</span></div><div class="c"><b>'+money(tt)+'</b><span>Total Income</span></div><div class="c k-wait"><b>'+money(wait)+'</b><span>Still waiting for Online files · '+n+' files</span></div><div class="c k-att" id="goAttn"><b>'+a.total+' files</b><span>Attention · bấm để xem</span></div></div>';
   h+='<div class="card"><h2>Informations / Tips</h2><div class="grid3" style="margin-top:6px">';
   h+=kv("Schedule C – NAICS",[["Food delivery","492000"],["Taxi / Rideshare","485300"],["Nail tech","812113"],["Hair / Barber","812112"],["Online selling","455000"],["Janitorial","561720"],["Babysitting","624410"],["Handyman","812990"],["Truck · long distance","484121"]]);
   h+='<div><h3>Tax brackets</h3><table class="t2"><tr><th></th><th class="n">Single</th><th class="n">MFJ</th><th class="n">HoH</th></tr>'+
@@ -263,7 +263,7 @@ function pageHome(){
   h+=kvEdit("Retirement contribution",S.retire);
   h+=emailBlock();
   h+='</div></div>';
-  h+='<div class="card"><div class="card-head"><h2>Summary</h2><div class="small">'+periodCtl()+'</div></div><div class="wrap">'+summary()+'</div>'+othersPanel()+'</div>';
+  if(isAdmin())h+='<div class="card"><div class="card-head"><h2>Summary</h2><div class="small">'+periodCtl()+'</div></div><div class="wrap">'+summary()+'</div>'+othersPanel()+'</div>';
   return h;
 }
 function kv(t,rows){return '<div><h3>'+t+'</h3><table class="t2 kv">'+rows.map(function(r){return '<tr><td>'+r[0]+'</td><td class="n">'+r[1]+'</td></tr>'}).join("")+'</table></div>'}
@@ -851,8 +851,8 @@ function render(){
     else $("#feeQ").oninput=function(){S.feeQ=this.value;var pos=this.selectionStart;render();var el=$("#feeQ");el.focus();el.setSelectionRange(pos,pos)};
   }
   if(p==="home"){
-    $("#goAttn").onclick=function(){S.page="attn";render()};
-    bindPeriod();bindHomeTips();
+    if($("#goAttn"))$("#goAttn").onclick=function(){S.page="attn";render()};
+    if($("#pYear"))bindPeriod();bindHomeTips();
     $$(".oth").forEach(function(e){e.onclick=function(){S.othersOpen=!S.othersOpen;render()}});
   }
 }
