@@ -1,10 +1,20 @@
-# Sao lưu database Supabase mỗi ngày (khoảng 3 giờ sáng giờ California).
-# File backup: GitHub > Actions > Daily database backup > chọn 1 lần chạy > Artifacts. Giữ 30 ngày.
+# Sao lưu database Supabase.
+#  - Mùa thuế (01/20 – 04/15): mỗi 2 giờ, cả ngày lẫn đêm. Bản quanh 2–3 giờ sáng giữ 90 ngày, các bản khác giữ 3 ngày.
+#  - Ngoài mùa thuế: mỗi ngày 1 lần khoảng 3 giờ sáng (giờ California), giữ 90 ngày.
+# File backup: GitHub > Actions > Daily database backup > chọn 1 lần chạy > Artifacts.
 # Cần 1 secret: SUPABASE_DB_URL = Session pooler URI (cổng 5432), xem README.
 name: Daily database backup
 on:
   schedule:
-    - cron: '17 10 * * *'   # 10:17 UTC
+    # Mùa thuế: mỗi 2 giờ (giờ UTC chẵn)
+    - cron: '7 */2 20-31 1 *'
+    - cron: '7 */2 * 2,3 *'
+    - cron: '7 */2 1-15 4 *'
+    # Ngoài mùa: 3 giờ sáng California (11:07 UTC mùa đông, 10:07 UTC mùa hè)
+    - cron: '7 11 1-19 1 *'
+    - cron: '7 10 16-30 4 *'
+    - cron: '7 10 * 5-10 *'
+    - cron: '7 11 * 11,12 *'
   workflow_dispatch: {}       # nút "Run workflow" để chạy tay
 permissions:
   contents: read
@@ -20,16 +30,27 @@ jobs:
           set -o pipefail
           if [ -z "$DB_URL" ]; then echo "::error::Chưa có secret SUPABASE_DB_URL (Settings > Secrets and variables > Actions)"; exit 1; fi
           case "$DB_URL" in *YOUR-PASSWORD*|*"["*) echo "::error::Trong SUPABASE_DB_URL còn [YOUR-PASSWORD] hoặc dấu [ ]"; exit 1;; esac
-          F="tax-backup-$(TZ=America/Los_Angeles date +%Y-%m-%d).sql.gz"
-          docker run --rm -e DB_URL postgres:17 sh -c 'pg_dump "$DB_URL" --schema=public --no-owner --no-privileges' | gzip -9 > "$F"
+          case "$DB_URL" in *"@db."*supabase.co*) echo "::error::Đang dùng Direct connection (db.xxx.supabase.co). Hãy dùng Session pooler (aws-...pooler.supabase.com:5432)"; exit 1;; esac
+          case "$DB_URL" in *:6543*) echo "::error::Đang dùng cổng 6543 (Transaction pooler). Backup cần Session pooler cổng 5432"; exit 1;; esac
+          docker pull -q postgres:17 > /dev/null
+          echo "Kiểm tra kết nối..."
+          if ! docker run --rm -e DB_URL postgres:17 sh -c 'psql "$DB_URL" -tAc "select current_setting(''server_version'')"' > ver.txt 2> err.txt; then
+            echo "::error::Không kết nối được database: $(tr '\n' ' ' < err.txt | sed -E 's#postgres(ql)?://[^ ]+#[url]#g' | cut -c1-300)"; exit 1; fi
+          echo "Supabase Postgres $(cat ver.txt)"
+          H=$(TZ=America/Los_Angeles date +%H)
+          KEEP=3; case "$H" in 02|03) KEEP=90;; esac
+          MD=$(TZ=America/Los_Angeles date +%m%d); if [ "$MD" -lt 0120 ] || [ "$MD" -gt 0415 ]; then KEEP=90; fi
+          F="tax-backup-$(TZ=America/Los_Angeles date +%Y-%m-%d_%H%M).sql.gz"
+          docker run --rm -e DB_URL postgres:17 sh -c 'pg_dump "$DB_URL" --schema=public --no-owner --no-privileges' 2> err.txt | gzip -9 > "$F" || {
+            echo "::error::pg_dump lỗi: $(tr '\n' ' ' < err.txt | sed -E 's#postgres(ql)?://[^ ]+#[url]#g' | cut -c1-300)"; exit 1; }
           SIZE=$(stat -c %s "$F")
-          echo "Backup $F: $SIZE bytes"
+          echo "Backup $F: $SIZE bytes, giữ $KEEP ngày"
           if [ "$SIZE" -lt 2000 ]; then echo "::error::File backup quá nhỏ, có lỗi"; exit 1; fi
-          echo "FILE=$F" >> "$GITHUB_ENV"
+          echo "FILE=$F" >> "$GITHUB_ENV"; echo "KEEP=$KEEP" >> "$GITHUB_ENV"
       - name: Save backup
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.FILE }}
           path: ${{ env.FILE }}
-          retention-days: 30
+          retention-days: ${{ env.KEEP }}
           compression-level: 0
