@@ -59,9 +59,9 @@ function ensureChatFrame(){
   var host=$("#chatHost");if(!host)return false;
   if(!$("#chatFrame")){
     var reset=lsGet("taxChatReset")==="1";
-    host.innerHTML='<div class="cdock" id="cdock" hidden><div class="cdock-h"><b>Chat</b><span style="flex:1"></span><button class="btn sm" id="cdBig" title="Mở trang Chat lớn">⤢</button><button class="btn sm" id="cdX" title="Thu nhỏ">–</button></div>'+
+    host.innerHTML='<div class="cdock" id="cdock" hidden><div class="cdock-h"><b>Chat</b><span style="flex:1"></span><button class="cso" id="cdOut" title="Sign out khỏi Chat (tài khoản Pub Club)">Sign out</button><button class="btn sm" id="cdBig" title="Mở trang Chat lớn">⤢</button><button class="btn sm" id="cdX" title="Thu nhỏ">–</button></div>'+
       '<div class="cbody"><iframe id="chatFrame" title="Chat" src="'+esc(CHAT_URL+(reset?"?reset=1":""))+'" allow="clipboard-write"></iframe></div></div>';
-    $("#cdX").onclick=closeChat;$("#cdBig").onclick=function(){S.page="chat";render()};
+    $("#cdX").onclick=closeChat;$("#cdOut").onclick=chatOnlySignOut;$("#cdBig").onclick=function(){S.page="chat";render()};
   }
   return true;
 }
@@ -74,6 +74,7 @@ function chatLayout(){
   var fab=$("#chatFab");if(fab)fab.hidden=S.chatOpen||isPhone();
 }
 window.addEventListener("resize",function(){if(S.me)chatLayout()});
+function chatOnlySignOut(){var f=$("#chatFrame");if(f){try{f.contentWindow.postMessage({pbtax:1,t:"logout"},CHAT_ORIGIN)}catch(e){}}setUnread(0)}
 function chatPage(){return '<div class="chatslot" id="chatSlot"></div>'}
 function openChat(){if(!ensureChatFrame())return;S.chatOpen=true;chatLayout();if(isPhone())renderPhoneNav()}
 function closeChat(){S.chatOpen=false;chatLayout();if(isPhone())renderPhoneNav()}
@@ -172,10 +173,10 @@ function togglePMenu(force){var m=$("#pmenu");var open=force!==undefined?force:!
   if(!open){m.innerHTML="";return}
   var it=[["attn","Attention",""]];
   if(isAdmin()){S.staff.forEach(function(t){if(t.id!==myTab())it.push([t.id,shortOf(t),"t"])});it.push(["reports","Reports","a"],["acct","Accounting","a"],["records","Records","a"],["settings","Settings","a"])}
-  it.push(["psearch","Search",""],["__pw","Đổi mật khẩu",""],["__out","Sign out","dg"]);
+  it.push(["psearch","Search",""],["__pw","Đổi mật khẩu",""]);if($("#chatFrame"))it.push(["__cout","Sign out Chat",""]);it.push(["__out","Sign out","dg"]);
   m.innerHTML='<div class="psheet"><div class="psheet-in">'+it.map(function(x){return '<button class="mi '+x[2]+(S.page===x[0]?' on':'')+'" data-pm="'+x[0]+'">'+esc(x[1])+'</button>'}).join("")+'</div></div>';
   m.firstChild.onclick=function(e){var b=e.target.closest("[data-pm]");if(!b){togglePMenu(false);return}var k=b.getAttribute("data-pm");togglePMenu(false);
-    if(k==="__pw"){showChangePw(false);return}if(k==="__out"){logout();return}
+    if(k==="__pw"){showChangePw(false);return}if(k==="__cout"){chatOnlySignOut();toast("Đã sign out Chat");return}if(k==="__out"){logout();return}
     closeChat();if(k==="settings")S.pSet=null;S.page=k;render();window.scrollTo(0,0)};
 }
 function renderPhoneNav(){
