@@ -167,9 +167,9 @@ function renderNav(){
   if(isAdmin()){items.push(["reports","Reports"]);items.push(["acct","Accounting"]);items.push(["records","Records"]);items.push(["settings","Settings"])}
   if(isPhone()){renderPhoneNav();return}
   items.push(["__chat","Chat"]);
-  $("#nav").innerHTML=items.map(function(x){return '<button data-p="'+x[0]+'" class="'+(S.page===x[0]?'on':'')+'">'+x[1]+(x[0]==="__chat"?'<i class="cbadge" id="chatBadge"'+(S.chatUnread?'':' hidden')+'>'+(S.chatUnread||"")+'</i>':'')+'</button>'}).join("");
+  $("#nav").innerHTML=items.map(function(x){return '<button data-p="'+x[0]+'" class="'+(S.page===x[0]||(x[0]==="__chat"&&S.page==="chat")?'on':'')+'">'+x[1]+(x[0]==="__chat"?'<i class="cbadge" id="chatBadge"'+(S.chatUnread?'':' hidden')+'>'+(S.chatUnread||"")+'</i>':'')+'</button>'}).join("");
   $("#sheets").innerHTML=S.staff.map(function(s){return '<button class="st'+(S.page===s.id?' on':'')+'" data-p="'+s.id+'" style="--c:'+(PALETTE[s.theme.color])+'">'+esc(s.name)+'</button>'}).join("")+(isAdmin()?'<button class="st add" data-p="__add" title="Chỉ Admin">+ Thêm tab</button>':'');
-  $$("[data-p]").forEach(function(b){b.onclick=function(){var k=b.getAttribute("data-p");if(k==="__add"){addStaff();return}if(k==="__chat"){openChat();return}S.page=k;render()}});
+  $$("[data-p]").forEach(function(b){b.onclick=function(){var k=b.getAttribute("data-p");if(k==="__add"){addStaff();return}if(k==="__chat")k="chat";S.page=k;render()}});
   $("#welcome").textContent="Welcome, "+me();
 }
 function addStaff(){
@@ -830,11 +830,12 @@ function loadLog(){api("GET","/log").then(function(l){S.log=l;S.logLoaded=true;i
 function render(){
   if(!S.me)return;
   if(!isAdmin()&&(S.page==="settings"||S.page==="reports"||S.page==="records"||S.page==="acct"))S.page="home";
-  if(!sById(S.page)&&["home","fees","appt","attn","reports","acct","records","settings","search","psearch"].indexOf(S.page)<0)S.page="home";
+  if(!sById(S.page)&&["home","fees","appt","attn","reports","acct","records","settings","search","psearch","chat"].indexOf(S.page)<0)S.page="home";
   renderNav();
   var p=S.page,pg=$("#page"),h;
-  if(isPhone()&&phoneRender(p,pg))return;
-  pg.className="page"+(isPhone()?" phone":"")+((p==="appt"||sById(p)||p==="attn"||p==="records"||p==="search")?" wide":"");
+  if(isPhone()&&p==="chat"){S.page=p="home";openChat()}
+  if(isPhone()&&phoneRender(p,pg)){afterRender();return}
+  pg.className="page"+(isPhone()?" phone":"")+((p==="appt"||sById(p)||p==="attn"||p==="records"||p==="search"||p==="chat")?" wide":"");
   if(p==="appt"&&S.apptSub!=="Work Schedule")ensureWeeks();
   if(p==="records"&&!S.rec){
     pg.innerHTML='<div class="muted">Đang tải Records…</div>';
@@ -845,8 +846,9 @@ function render(){
     return;
   }
   if(p==="settings"&&S.setSub==="log"&&!S.logLoaded)loadLog();
-  if(p==="home")h=pageHome();else if(p==="fees")h=pageFees();else if(p==="appt")h=pageAppt();else if(p==="attn")h=pageAttn();else if(p==="reports")h=pageReports();else if(p==="acct")h=pageAcct();else if(p==="records")h=pageRecords();else if(p==="search")h=pageSearch();else if(p==="settings")h=pageSettings();else h=pageStaff(p);
+  if(p==="chat")h=chatPage();else if(p==="home")h=pageHome();else if(p==="fees")h=pageFees();else if(p==="appt")h=pageAppt();else if(p==="attn")h=pageAttn();else if(p==="reports")h=pageReports();else if(p==="acct")h=pageAcct();else if(p==="records")h=pageRecords();else if(p==="search")h=pageSearch();else if(p==="settings")h=pageSettings();else h=pageStaff(p);
   pg.innerHTML=h;
+  afterRender();
   if(p==="appt")bindAppt();
   if(p==="settings")bindSettings();
   if(p==="records")bindRecords();

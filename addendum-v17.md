@@ -28,7 +28,7 @@
    - **Peter** tự giữ tiền: không có ô Thực nhận, không tính vào "Phải nộp", vẫn tính vào "Cả office".
 
 ## Cài đặt (theo thứ tự)
-1. **Pub Club trước**: up bản vá Chat (`PubClub-v81-taxchat-patch.zip`, xem `addendum-taxchat.md` trong đó). Không cần SQL.
+1. **Pub Club trước**: up bản vá Chat (`PubClub-v82-taxchat-patch.zip`, xem `addendum-taxchat.md` trong đó). Không cần SQL.
 2. **Supabase (FSMA Tax)** > SQL Editor: chạy `sql/07-v17.sql` (chạy lại lần 2 cũng không sao).
 3. **GitHub FSMA-Tax**: up các file trong `FSMA-Tax-update-v17.zip` (kéo thả thư mục, cùng đường dẫn sẽ ghi đè). Netlify tự deploy.
 4. Kiểm tra: mở tax.fsma.team, thấy First Source + icon nhà. Settings > Customer messages > Gửi thử tới số của mình. Lúc này sẽ báo "demo" vì chưa nối Twilio.
@@ -82,3 +82,11 @@ Chi phí ước tính: khoảng 4.000 tin / mùa (20 hẹn × ~63 ngày × 3 tin
   - Form phone thêm hồ sơ / hẹn / xóa hẹn.
   - Chat trong Tax với Pub Club local: log in, sign out Tax → phiên Chat bị xóa.
 - Chưa thử được với Twilio thật và Supabase thật: kiểm tra sau khi deploy.
+
+## v17.1 (sau khi deploy)
+- Top producers luôn hiện trên Homepage. Chưa có hồ sơ thì ghi "Chưa có hồ sơ".
+- Chat:
+  - Menu **Chat** mở trang Chat lớn, chiếm hết phần dưới menu, giống pb.fsma.team.
+  - Nút **Chat** tròn ở góc phải dưới mở cửa sổ nhỏ: 350px, chữ thu nhỏ 86% để thấy nhiều dòng hơn. Nút ⤢ trên cửa sổ nhỏ mở trang lớn.
+  - Phone giữ như cũ (toàn màn hình).
+- File đổi: `public/index.html` (số ?v=171 để trình duyệt tải bản mới), `public/js/v17.js`, `public/js/app.js`, `public/css/app.css`.

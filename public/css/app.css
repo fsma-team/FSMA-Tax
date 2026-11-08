@@ -321,11 +321,19 @@ table.pay .otn{font-size:11px;color:var(--orange-ink);margin-right:6px}
 .rk.r1{background:#c99a06}.rk.r2{background:#8a96a3}.rk.r3{background:#b06a2c}
 @media(max-width:900px){.tp-grid{grid-template-columns:1fr}.tp-cat{border-left:0;border-top:1px solid var(--line2)}.tp-cat:first-child{border-top:0}}
 /* chat dock */
-.cdock{position:fixed;right:16px;bottom:0;width:380px;height:min(620px,calc(100vh - 70px));background:var(--panel);border:1px solid var(--line);border-bottom:0;border-radius:8px 8px 0 0;box-shadow:0 -4px 22px rgba(0,0,0,.18);display:flex;flex-direction:column;z-index:40}
-.cdock-h{display:flex;align-items:center;gap:8px;padding:6px 8px 6px 12px;background:var(--blue);color:#fff;border-radius:8px 8px 0 0}
+.cdock{position:fixed;right:16px;bottom:0;width:350px;height:min(540px,calc(100vh - 80px));background:var(--panel);border:1px solid var(--line);border-bottom:0;border-radius:8px 8px 0 0;box-shadow:0 -4px 22px rgba(0,0,0,.18);display:flex;flex-direction:column;z-index:40}
+.cdock-h{display:flex;align-items:center;gap:6px;padding:4px 6px 4px 12px;font-size:13px;background:var(--blue);color:#fff;border-radius:8px 8px 0 0}
 .cdock-h .muted{color:rgba(255,255,255,.75)}
 .cdock-h .btn{background:transparent;border-color:rgba(255,255,255,.4);color:#fff}
-.cdock iframe{flex:1;border:0;width:100%;background:var(--panel)}
+.cdock .cbody{flex:1;position:relative;overflow:hidden}
+.cdock iframe{position:absolute;top:0;left:0;border:0;width:calc(100% / .86);height:calc(100% / .86);zoom:.86;background:var(--panel)}
+.cdock.big{position:absolute;right:auto;bottom:auto;border:1px solid var(--line);border-radius:6px;box-shadow:none;z-index:15}
+.cdock.big .cdock-h{display:none}
+.cdock.big iframe{zoom:1;width:100%;height:100%}
+.chatslot{min-height:420px}
+.page.wide:has(.chatslot){padding-bottom:0}
+.chatfab{position:fixed;right:18px;bottom:16px;z-index:39;background:var(--blue);color:#fff;border:0;border-radius:20px;padding:8px 16px;font:700 13.5px "Segoe UI",Arial,sans-serif;box-shadow:0 2px 10px rgba(0,0,0,.25);cursor:pointer}
+.chatfab .cbadge{display:inline-block;min-width:16px;height:16px;line-height:16px;padding:0 4px;margin-left:6px;border-radius:8px;background:var(--red);color:#fff;font:700 10.5px/16px Arial,sans-serif;font-style:normal;text-align:center}
 /* cash lock */
 .lockbar{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;border:1px solid var(--line);border-radius:4px;padding:6px 10px;margin-bottom:10px;background:var(--head)}
 table.acct tr.carry td{background:var(--yellow);font-size:12.5px;white-space:normal;height:auto;padding:3px 8px}
@@ -485,6 +493,8 @@ table.acct input:disabled{background:var(--head);color:var(--muted)}
   .psrch{display:flex;gap:6px}.psrch input{flex:1}
   .cdock{right:0;left:0;top:calc(40px + env(safe-area-inset-top,0px));bottom:calc(46px + env(safe-area-inset-bottom,0px));width:auto;height:auto;border-radius:0;box-shadow:none;border:0;z-index:44}
   .cdock-h{display:none}
+  .cdock iframe{zoom:1;width:100%;height:100%}
+  .chatfab{display:none}
   .toast{bottom:calc(64px + env(safe-area-inset-bottom,0px))}
   .login-box{padding:18px}
 }

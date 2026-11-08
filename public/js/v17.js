@@ -34,9 +34,9 @@ function tpData(){
 function crownSvg(c,sz){return '<svg viewBox="0 0 24 24" width="'+sz+'" height="'+sz+'" aria-hidden="true"><path d="M3 7.5l4.6 4.2L12 4.5l4.4 7.2L21 7.5 19.2 17H4.8z" fill="'+c+'"/><rect x="4.8" y="17.6" width="14.4" height="2.6" rx="1.1" fill="'+c+'" opacity=".8"/></svg>'}
 function tpLabel(D){return D.mode==="week"?'Tuần này '+md(D.from)+' – '+md(D.to):'Cả mùa '+mdy(D.from).slice(0,5)+' – '+mdy(D.to)}
 function topProducersCard(){
-  var D=tpData();if(D.empty)return "";var me=myTab();
+  var D=tpData(),me=myTab();
   return '<div class="card tp"><div class="tp-head"><h2>Top producers</h2><span class="muted small">'+tpLabel(D)+'</span></div><div class="tp-grid">'+D.cats.map(function(c){
-    return '<div class="tp-cat"><div class="tp-h">'+crownSvg(c.color,18)+c.title+'</div><ol>'+(c.rows.length?c.rows.map(function(r){return '<li class="'+(r.tab===me?'me':'')+'"><span class="rk r'+r.rk+'">'+r.rk+'</span><span class="nm">'+esc(r.name)+'</span><b>'+r.v+'</b></li>'}).join(""):'<li class="muted">—</li>')+'</ol></div>'}).join("")+'</div></div>';
+    return '<div class="tp-cat"><div class="tp-h">'+crownSvg(c.color,18)+c.title+'</div><ol>'+(c.rows.length?c.rows.map(function(r){return '<li class="'+(r.tab===me?'me':'')+'"><span class="rk r'+r.rk+'">'+r.rk+'</span><span class="nm">'+esc(r.name)+'</span><b>'+r.v+'</b></li>'}).join(""):'<li class="muted"><span></span><span class="nm">Chưa có hồ sơ</span><b></b></li>')+'</ol></div>'}).join("")+'</div></div>';
 }
 function bindTopProducers(){}
 
@@ -53,18 +53,36 @@ function setUnread(n){S.chatUnread=n;$$(".cbadge").forEach(function(b){b.textCon
 window.addEventListener("message",function(e){if(e.origin!==CHAT_ORIGIN||!e.data||!e.data.pbtax)return;
   if(e.data.t==="unread")setUnread(+e.data.n||0);
   if(e.data.t==="ready")lsSet("taxChatReset",null)});
-function openChat(){
-  var host=$("#chatHost");if(!host)return;
+/* mode: "page" = big Chat page (same as pb.fsma.team), "dock" = small window at the bottom right, phone = full screen */
+S.chatMode="";
+function ensureChatFrame(){
+  var host=$("#chatHost");if(!host)return false;
   if(!$("#chatFrame")){
     var reset=lsGet("taxChatReset")==="1";
-    host.innerHTML='<div class="cdock" id="cdock"><div class="cdock-h"><b>Chat</b><span class="muted small">tài khoản Pub Club</span><span style="flex:1"></span><button class="btn sm" id="cdMin" title="Thu nhỏ">–</button><button class="btn sm" id="cdX" title="Đóng">×</button></div>'+
-      '<iframe id="chatFrame" title="Chat" src="'+esc(CHAT_URL+(reset?"?reset=1":""))+'" allow="clipboard-write"></iframe></div>';
-    $("#cdMin").onclick=closeChat;$("#cdX").onclick=closeChat;
+    host.innerHTML='<div class="cdock" id="cdock" hidden><div class="cdock-h"><b>Chat</b><span style="flex:1"></span><button class="btn sm" id="cdBig" title="Mở trang Chat lớn">⤢</button><button class="btn sm" id="cdX" title="Thu nhỏ">–</button></div>'+
+      '<div class="cbody"><iframe id="chatFrame" title="Chat" src="'+esc(CHAT_URL+(reset?"?reset=1":""))+'" allow="clipboard-write"></iframe></div></div>';
+    $("#cdX").onclick=closeChat;$("#cdBig").onclick=function(){S.page="chat";render()};
   }
-  $("#cdock").hidden=false;S.chatOpen=true;document.body.classList.add("chat-open");
-  if(isPhone())renderPhoneNav();
+  return true;
 }
-function closeChat(){var d=$("#cdock");if(d)d.hidden=true;S.chatOpen=false;document.body.classList.remove("chat-open");if(isPhone())renderPhoneNav()}
+function chatLayout(){
+  var d=$("#cdock");if(!d)return;
+  var slot=$("#chatSlot");
+  if(slot&&!isPhone()){slot.style.height=Math.max(420,window.innerHeight-slot.getBoundingClientRect().top-14)+"px";var r=slot.getBoundingClientRect();d.className="cdock big";d.style.top=(r.top+window.scrollY)+"px";d.style.left=(r.left+window.scrollX)+"px";d.style.width=r.width+"px";d.style.height=r.height+"px";d.hidden=false;S.chatMode="page";var fb=$("#chatFab");if(fb)fb.hidden=true;return}
+  d.style.top=d.style.left=d.style.width=d.style.height="";d.className="cdock";
+  d.hidden=!S.chatOpen;S.chatMode=S.chatOpen?(isPhone()?"phone":"dock"):"";
+  var fab=$("#chatFab");if(fab)fab.hidden=S.chatOpen||isPhone();
+}
+window.addEventListener("resize",function(){if(S.me)chatLayout()});
+function chatPage(){return '<div class="chatslot" id="chatSlot"></div>'}
+function openChat(){if(!ensureChatFrame())return;S.chatOpen=true;chatLayout();if(isPhone())renderPhoneNav()}
+function closeChat(){S.chatOpen=false;chatLayout();if(isPhone())renderPhoneNav()}
+function afterRender(){
+  if(!isPhone()&&!$("#chatFab")&&$("#chatHost"))$("#chatHost").insertAdjacentHTML("beforebegin",'<button class="chatfab" id="chatFab" title="Chat">Chat<i class="cbadge"'+(S.chatUnread?'':' hidden')+'>'+(S.chatUnread||"")+'</i></button>');
+  var fab=$("#chatFab");if(fab)fab.onclick=openChat;
+  if(S.page==="chat"&&!isPhone())ensureChatFrame();
+  chatLayout();
+}
 
 /* ================= Text messages (Settings > Customer messages) ================= */
 var SMS_EV=[["created","Booking created","Hẹn mới · gửi khi lưu hẹn mới"],["reminder","Booking reminder","Nhắc hẹn · gửi trước giờ hẹn"],["updated","Booking updated","Đổi hẹn · gửi khi đổi ngày / giờ"],["cancelled","Booking cancelled","Hủy hẹn · gửi khi xóa hẹn"]];
@@ -197,7 +215,7 @@ function myBookingsToday(){var t=todayISO(),me1=norm(me()),tabN=myTabObj()?norm(
   return out.sort(function(a,b){return a.slot<b.slot?-1:1})}
 function phoneHome(){
   var D=tpData(),me1=myTab(),h='';
-  if(!D.empty)h+='<div class="psec"><div class="pl-top"><b>Top producers</b><span>'+tpLabel(D)+'</span></div><div class="pl">'+D.cats.map(function(c){return '<div class="pl-row"><span class="pl-h">'+crownSvg(c.color,14)+c.title+'</span>'+(c.rows.length?c.rows.map(function(r){return '<span class="pl-p'+(r.tab===me1?' me':'')+'"><span class="rk r'+r.rk+'">'+r.rk+'</span><span class="nm">'+esc(r.name)+'</span><b>'+r.v+'</b></span>'}).join(""):'<span class="muted small">—</span>')+'</div>'}).join("")+'</div></div>';
+  h+='<div class="psec"><div class="pl-top"><b>Top producers</b><span>'+tpLabel(D)+'</span></div><div class="pl">'+D.cats.map(function(c){return '<div class="pl-row"><span class="pl-h">'+crownSvg(c.color,14)+c.title+'</span>'+(c.rows.length?c.rows.map(function(r){return '<span class="pl-p'+(r.tab===me1?' me':'')+'"><span class="rk r'+r.rk+'">'+r.rk+'</span><span class="nm">'+esc(r.name)+'</span><b>'+r.v+'</b></span>'}).join(""):'<span class="muted small">—</span>')+'</div>'}).join("")+'</div></div>';
   var W=wsWeek(),dn=["T2","T3","T4","T5","T6","T7","CN"],td=todayISO();
   if(W.order.length)h+='<div class="psec"><div class="pl-top"><b>Work Schedule</b><span>Tuần này</span></div><table class="ws"><tr><th></th>'+W.days.map(function(d,i){return '<th class="'+(d===td?'td':'')+'">'+dn[i]+'</th>'}).join("")+'</tr>'+W.order.map(function(n){return '<tr><td>'+esc(n)+'</td>'+W.days.map(function(d){return '<td class="'+(d===td?'td':'')+'">'+(W.names[n][d]?'<span class="dot"></span>':'')+'</td>'}).join("")+'</tr>'}).join("")+'</table></div>';
   var bk=myBookingsToday();
