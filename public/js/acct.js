@@ -12,38 +12,87 @@ function n0(v){return v==null||v===""?0:+v}
 function fmt2(n){return "$"+(+n).toFixed(2)}
 function numOrBlank(v){return v==null?"":String(+v)}
 
-/* ---------- Cash cuối ngày ---------- */
+/* ---------- Cash cuối ngày (v17: nhập Thực nhận = đã nhận · Lock day · Peter tự giữ) ---------- */
 /* Ngày tiền vào: hồ sơ thường = Date; hồ sơ Online = ngày tick Paid (chưa Paid thì chưa tính) */
 function payDay(r){if(r.status==="Refund")return null;if(r.online)return r.paid?(r.paidDate||null):null;return r.date||null}
-function cashMap(){var m={};
+function selfKeep(t){var L=(S.selfKeep&&S.selfKeep.length)?S.selfKeep:["Peter"];return L.indexOf(t.name)>=0}
+function z4(){return {n:0,cash:0,check:0,zl:0}}
+function addTo(a,b,k){k=k||1;a.n+=k*b.n;a.cash+=k*b.cash;a.check+=k*b.check;a.zl+=k*b.zl;return a}
+function isZero(x){return !x.n&&!Math.round(x.cash*100)&&!Math.round(x.check*100)&&!Math.round(x.zl*100)}
+function r2(x){return {n:x.n,cash:Math.round(x.cash*100)/100,check:Math.round(x.check*100)/100,zl:Math.round(x.zl*100)/100}}
+/* every record that brings money, grouped by day */
+function cashRecs(){var m={};
   S.staff.forEach(function(t){live(t.id).forEach(function(r){var d=payDay(r);if(!d||!r.amt)return;
-    var x=((m[d]=m[d]||{})[t.dbId]=m[d][t.dbId]||{n:0,cash:0,check:0,zl:0});x.n++;
-    if(r.method==="Cash")x.cash+=r.amt;else if(r.method==="Check")x.check+=r.amt;else x.zl+=r.amt})});
+    var x={id:String(r.id||("p"+t.dbId+"-"+r.pos)),tab:t.dbId,name:r.name,n:1,cash:0,check:0,zl:0};
+    if(r.method==="Cash")x.cash=r.amt;else if(r.method==="Check")x.check=r.amt;else x.zl=r.amt;(m[d]=m[d]||[]).push(x)})});
   return m}
+function byTab(list){var o={};(list||[]).forEach(function(x){addTo(o[x.tab]=o[x.tab]||z4(),x)});return o}
 function cashRec(day,tab){return (S.acct.cash||[]).filter(function(c){return c.day===day&&c.tab_id===tab})[0]}
+function lockOf(d){return (S.acct.locks||[]).filter(function(l){return l.day===d})[0]}
+/* the whole picture: own money of each day, what moved to a later day after a Lock, and what each day expects */
+function cashModel(){
+  var recs=cashRecs(),locks=(S.acct.locks||[]).slice().sort(function(a,b){return a.day<b.day?-1:1}),lm={},absorbed={},carries=[];
+  locks.forEach(function(l){lm[l.day]=l});
+  var firstOpen=function(d){for(var i=0;i<400&&lm[d];i++)d=addDays(d,1);return d};
+  locks.forEach(function(l){var ab=(l.snap&&l.snap.absorbed)||{};Object.keys(ab).forEach(function(D){Object.keys(ab[D]).forEach(function(tab){addTo((absorbed[D]=absorbed[D]||{})[tab]=absorbed[D][tab]||z4(),ab[D][tab])})})});
+  locks.forEach(function(l){var D=l.day,cur=byTab(recs[D]),sn=(l.snap&&l.snap.own)||{},tabs={};
+    [cur,sn,absorbed[D]||{}].forEach(function(o){Object.keys(o).forEach(function(k){tabs[k]=1})});
+    var snRec=(l.snap&&l.snap.rec)||{},now={};(recs[D]||[]).forEach(function(x){now[x.id]=x});
+    Object.keys(tabs).forEach(function(tab){
+      var rem=addTo(addTo(addTo(z4(),cur[tab]||z4()),sn[tab]||z4(),-1),(absorbed[D]||{})[tab]||z4(),-1);
+      if(isZero(rem))return;
+      var items=[];
+      (recs[D]||[]).forEach(function(x){if(String(x.tab)!==tab)return;var o=snRec[x.id];if(!o)items.push("thêm "+x.name);else if(o[1]!==x.cash||o[2]!==x.check||o[3]!==x.zl)items.push("sửa "+x.name+" "+money(o[1]+o[2]+o[3])+" → "+money(x.cash+x.check+x.zl))});
+      Object.keys(snRec).forEach(function(id){var o=snRec[id];if(String(o[0])===tab&&!now[id])items.push("bỏ "+(o[4]||"(trống)"))});
+      carries.push({from:D,to:firstOpen(addDays(D,1)),tab:+tab,v:r2(rem),items:items})})});
+  var exp=function(d){var l=lm[d];if(l)return (l.snap&&l.snap.exp)||{};var o={},own=byTab(recs[d]);Object.keys(own).forEach(function(k){o[k]=addTo(z4(),own[k])});
+    carries.forEach(function(c){if(c.to===d)addTo(o[c.tab]=o[c.tab]||z4(),c.v)});return o};
+  return {recs:recs,lm:lm,carries:carries,exp:exp};
+}
 function diffHtml(rec,exp){if(!rec||rec.received==null)return exp?'<span class="muted">chưa nhận</span>':'';var d=Math.round((rec.received-exp)*100)/100;return d===0?'<span class="ok">0</span>':'<span class="bad">'+(d>0?"+":"")+money(d)+'</span>'}
+function cashTabs(){return S.staff.slice().sort(function(a,b){return (selfKeep(a)?1:0)-(selfKeep(b)?1:0)})}
 function pageCash(){
-  var day=S.cashDay,cm=cashMap(),today=cm[day]||{},T={n:0,cash:0,check:0,zl:0,rec:0};
-  var h='<div class="ctl-row"><button class="btn sm" id="cdPrev">‹</button><input type="date" id="cashDay" value="'+day+'"><button class="btn sm" id="cdNext">›</button><button class="btn sm" id="cdToday">Hôm nay</button>'+
-    '<span class="muted small">Cash / Check / Zelle / Venmo lấy từ tab hồ sơ (Online chỉ tính khi đã tick Paid, theo ngày Paid). Check và Zelle / Venmo chỉ để đối chiếu.</span></div>';
-  h+='<div class="wrap"><table class="t2 acct" id="cashT"><tr><th>Preparer</th><th class="n">Hồ sơ</th><th class="n">Cash (theo hồ sơ)</th><th class="n">Check</th><th class="n">Zelle / Venmo</th><th class="n">Cash thực nhận</th><th class="n">Chênh lệch</th><th>Đã nhận</th><th>Note</th><th>Người nhận</th></tr>';
-  S.staff.forEach(function(t){var x=today[t.dbId]||{n:0,cash:0,check:0,zl:0},rec=cashRec(day,t.dbId);
-    T.n+=x.n;T.cash+=x.cash;T.check+=x.check;T.zl+=x.zl;if(rec&&rec.received!=null)T.rec+=rec.received;
-    h+='<tr data-tab="'+t.dbId+'" data-exp="'+x.cash+'"'+(x.n||rec?'':' class="dim"')+'><td>'+esc(t.name)+'</td><td class="n">'+(x.n||"")+'</td><td class="n">'+(x.cash?money(x.cash):"–")+'</td><td class="n">'+(x.check?money(x.check):"–")+'</td><td class="n">'+(x.zl?money(x.zl):"–")+'</td>'+
-      '<td class="n"><input type="number" step="0.01" class="cin" data-c="received" value="'+(rec&&rec.received!=null?rec.received:"")+'"></td><td class="n cdiff">'+diffHtml(rec,x.cash)+'</td>'+
-      '<td class="c"><input type="checkbox" data-c="done"'+(rec&&rec.done?' checked':'')+'></td><td><input type="text" class="cnote" data-c="note" value="'+esc(rec?rec.note:"")+'"></td><td class="muted small cby">'+(rec&&rec.by?esc(rec.by)+' · '+fmtTs(rec.at):"")+'</td></tr>'});
-  var dt=Math.round((T.rec-T.cash)*100)/100;
-  h+='<tr class="tot" id="cashTot"><td>Tổng</td><td class="n">'+T.n+'</td><td class="n">'+money(T.cash)+'</td><td class="n">'+money(T.check)+'</td><td class="n">'+money(T.zl)+'</td><td class="n">'+money(T.rec)+'</td><td class="n">'+(dt===0?'<span class="ok">0</span>':'<span class="bad">'+money(dt)+'</span>')+'</td><td colspan="3"></td></tr></table></div>';
+  var M=cashModel(),day=S.cashDay,E=M.exp(day),L=M.lm[day],T=z4(),TO=z4(),got=0,pending=[];
+  var h='<div class="ctl-row"><button class="btn sm" id="cdPrev">‹</button><input type="date" id="cashDay" value="'+day+'"><button class="btn sm" id="cdNext">›</button><button class="btn sm" id="cdToday">Hôm nay</button></div>';
+  var tabs=cashTabs();
+  tabs.forEach(function(t){var x=E[t.dbId]||z4(),rec=cashRec(day,t.dbId);if(selfKeep(t))return;if(x.cash&&!(rec&&rec.received!=null))pending.push(shortOf(t))});
+  h+='<div class="lockbar">'+(L?'<span class="pill">🔒 Locked '+fmtTs(L.at)+(L.by?' · '+esc(L.by):'')+'</span><button class="btn sm" id="cUnlock">Unlock</button><span class="muted small">Thêm / sửa / xóa hồ sơ của ngày này sẽ tính qua ngày '+md(addDays(day,1))+' (hoặc ngày đầu tiên chưa Lock).</span>'
+    :'<span class="pill r">Chưa Lock</span><button class="btn pri sm" id="cLock">Lock day</button><span class="muted small">'+(pending.length?esc(pending.join(", "))+' chưa nhập Thực nhận · ':'')+'Lock xong, hồ sơ thêm / sửa sau đó tính qua ngày hôm sau.</span>')+'</div>';
+  var carriesIn=M.carries.filter(function(c){return c.to===day});
+  if(isPhone()){
+    h+='<div class="ccards">';
+    tabs.forEach(function(t){var x=E[t.dbId]||z4(),rec=cashRec(day,t.dbId),sk=selfKeep(t),cin=carriesIn.filter(function(c){return c.tab===t.dbId});
+      addTo(TO,x);if(!sk){addTo(T,x);if(rec&&rec.received!=null)got+=rec.received}
+      if(!x.n&&!rec&&!cin.length)return;
+      h+='<div class="ccard'+(sk?' dimc':'')+'" data-tab="'+t.dbId+'" data-exp="'+x.cash+'"><div class="top2"><b>'+esc(shortOf(t))+'</b><span class="muted">'+x.n+' hồ sơ</span></div>'+
+        '<div class="nums"><div><small>Cash</small>'+money(x.cash)+'</div><div><small>Check</small>'+(x.check?money(x.check):"–")+'</div><div><small>Zelle/Venmo</small>'+(x.zl?money(x.zl):"–")+'</div></div>'+
+        cin.map(function(c){return '<div class="carry">Từ '+md(c.from)+': '+(c.v.cash>=0?"+":"")+money(c.v.cash)+' cash'+(c.items.length?' · '+esc(c.items.join("; ")):'')+'</div>'}).join("")+
+        (sk?'<span class="muted small">Tự giữ tiền · chỉ tính vào Cả office</span>':'<div class="rcv"><span class="muted">Thực nhận</span><input type="number" inputmode="decimal" step="0.01" class="cin" data-c="received" value="'+(rec&&rec.received!=null?rec.received:"")+'"'+(L?' disabled':'')+'><span class="cdiff">'+diffHtml(rec,x.cash)+'</span></div>')+'</div>'});
+    h+='<div class="ccard tot"><div class="top2"><b>Phải nộp</b><b id="cashExp">'+money(T.cash)+'</b></div><div class="top2"><span class="muted">Đã nhận</span><span id="cashGot">'+money(got)+'</span></div><div class="top2"><span class="muted">Cả office (gồm tự giữ)</span><span>'+money(TO.cash)+' cash · '+money(TO.check+TO.zl)+' khác</span></div></div></div>';
+  }else{
+    h+='<div class="wrap"><table class="t2 acct" id="cashT"><tr><th>Preparer</th><th class="n">Hồ sơ</th><th class="n">Cash (theo hồ sơ)</th><th class="n">Check</th><th class="n">Zelle / Venmo</th><th class="n">Cash thực nhận</th><th class="n">Chênh lệch</th><th>Note</th><th>Người nhận</th></tr>';
+    tabs.forEach(function(t){var x=E[t.dbId]||z4(),rec=cashRec(day,t.dbId),sk=selfKeep(t),cin=carriesIn.filter(function(c){return c.tab===t.dbId});
+      addTo(TO,x);if(!sk){addTo(T,x);if(rec&&rec.received!=null)got+=rec.received}
+      cin.forEach(function(c){h+='<tr class="carry"><td colspan="9">↳ '+esc(shortOf(t))+' · từ '+md(c.from)+' (sau Lock): '+(c.v.n?(c.v.n>0?"+":"")+c.v.n+' hồ sơ · ':'')+'Cash '+(c.v.cash>=0?"+":"")+money(c.v.cash)+(c.v.check?' · Check '+money(c.v.check):'')+(c.v.zl?' · Zelle '+money(c.v.zl):'')+(c.items.length?' · '+esc(c.items.join("; ")):'')+'</td></tr>'});
+      if(sk){h+='<tr class="dim"><td>'+esc(t.name)+' <span class="pill">Tự giữ</span></td><td class="n">'+(x.n||"")+'</td><td class="n">'+(x.cash?money(x.cash):"–")+'</td><td class="n">'+(x.check?money(x.check):"–")+'</td><td class="n">'+(x.zl?money(x.zl):"–")+'</td><td class="n muted">không thu</td><td></td><td></td><td></td></tr>';return}
+      h+='<tr data-tab="'+t.dbId+'" data-exp="'+x.cash+'"'+(x.n||rec?'':' class="dim"')+'><td>'+esc(t.name)+'</td><td class="n">'+(x.n||"")+'</td><td class="n">'+(x.cash?money(x.cash):"–")+'</td><td class="n">'+(x.check?money(x.check):"–")+'</td><td class="n">'+(x.zl?money(x.zl):"–")+'</td>'+
+        '<td class="n"><input type="number" step="0.01" class="cin" data-c="received" value="'+(rec&&rec.received!=null?rec.received:"")+'"'+(L?' disabled':'')+'></td><td class="n cdiff">'+diffHtml(rec,x.cash)+'</td>'+
+        '<td><input type="text" class="cnote" data-c="note" value="'+esc(rec?rec.note:"")+'"'+(L?' disabled':'')+'></td><td class="muted small cby">'+(rec&&rec.by&&rec.received!=null?esc(rec.by)+' · '+fmtTs(rec.at):"")+'</td></tr>'});
+    var dt=Math.round((got-T.cash)*100)/100;
+    h+='<tr class="tot" id="cashTot"><td>Phải nộp</td><td class="n">'+T.n+'</td><td class="n">'+money(T.cash)+'</td><td class="n">'+money(T.check)+'</td><td class="n">'+money(T.zl)+'</td><td class="n">'+money(got)+'</td><td class="n">'+(dt===0?'<span class="ok">0</span>':'<span class="bad">'+money(dt)+'</span>')+'</td><td colspan="2"></td></tr>';
+    h+='<tr class="tot2"><td>Cả office</td><td class="n">'+TO.n+'</td><td class="n">'+money(TO.cash)+'</td><td class="n">'+money(TO.check)+'</td><td class="n">'+money(TO.zl)+'</td><td colspan="4" class="muted small">gồm cả người tự giữ tiền</td></tr></table></div>';
+  }
+  h+='<div class="muted small" style="margin-top:6px">Gõ số vào Cash thực nhận = đã nhận. Online chỉ tính khi đã tick Paid, theo ngày Paid. Người tự giữ tiền (Peter) không phải nộp, chỉ tính vào Cả office.</div>';
   // history
-  var days={};Object.keys(cm).forEach(function(d){days[d]=1});(S.acct.cash||[]).forEach(function(c){days[c.day]=1});
-  var list=Object.keys(days).filter(function(d){return d!==day}).sort().reverse().slice(0,60);
+  var days={};Object.keys(M.recs).forEach(function(d){days[d]=1});(S.acct.cash||[]).forEach(function(c){days[c.day]=1});Object.keys(M.lm).forEach(function(d){days[d]=1});M.carries.forEach(function(c){days[c.to]=1});
+  var list=Object.keys(days).filter(function(d){return d!==day&&d<=addDays(todayISO(),1)}).sort().reverse().slice(0,60);
   h+='<h3 style="margin-top:22px">Các ngày khác</h3>';
   if(!list.length)h+='<div class="muted">Chưa có ngày nào.</div>';
-  else h+='<div class="wrap"><table class="t2 acct"><tr><th>Ngày</th><th class="n">Cash theo hồ sơ</th><th class="n">Cash thực nhận</th><th class="n">Check</th><th class="n">Zelle / Venmo</th><th>Trạng thái</th><th>Người nhận</th></tr>'+list.map(function(d){
-      var e={cash:0,check:0,zl:0},got=0,pend=0,by={};Object.keys(cm[d]||{}).forEach(function(k){var x=cm[d][k];e.cash+=x.cash;e.check+=x.check;e.zl+=x.zl;var r=cashRec(d,+k);if(x.cash&&!(r&&r.received!=null))pend++});
-      (S.acct.cash||[]).forEach(function(c){if(c.day===d){if(c.received!=null)got+=c.received;if(c.by)by[c.by]=1}});
+  else h+='<div class="wrap"><table class="t2 acct"><tr><th>Ngày</th><th class="n">Phải nộp (cash)</th><th class="n">Đã nhận</th><th class="n">Check</th><th class="n">Zelle / Venmo</th><th>Trạng thái</th><th>Lock</th></tr>'+list.map(function(d){
+      var e=z4(),got=0,pend=0,Ed=M.exp(d);S.staff.forEach(function(t){if(selfKeep(t))return;var x=Ed[t.dbId];if(!x)return;addTo(e,x);var r=cashRec(d,t.dbId);if(x.cash&&!(r&&r.received!=null))pend++});
+      (S.acct.cash||[]).forEach(function(c){if(c.day===d&&c.received!=null)got+=c.received});
       var df=Math.round((got-e.cash)*100)/100,st=pend?'<span class="pill r">Chưa nhận '+pend+' người</span>':df===0?'<span class="pill g">Đủ</span>':'<span class="pill r">'+(df<0?"Thiếu ":"Dư ")+money(Math.abs(df))+'</span>';
-      return '<tr><td><a href="#" data-cday="'+d+'">'+mdy(d)+'</a></td><td class="n">'+money(e.cash)+'</td><td class="n">'+money(got)+'</td><td class="n">'+money(e.check)+'</td><td class="n">'+money(e.zl)+'</td><td>'+st+'</td><td class="muted small">'+esc(Object.keys(by).join(", "))+'</td></tr>'}).join("")+'</table></div>';
+      return '<tr><td><a href="#" data-cday="'+d+'">'+mdy(d)+'</a></td><td class="n">'+money(e.cash)+'</td><td class="n">'+money(got)+'</td><td class="n">'+money(e.check)+'</td><td class="n">'+money(e.zl)+'</td><td>'+st+'</td><td>'+(M.lm[d]?'🔒':'')+'</td></tr>'}).join("")+'</table></div>';
   return h;
 }
 function bindCash(){
@@ -51,17 +100,27 @@ function bindCash(){
   $("#cashDay").onchange=function(){if(this.value)go(this.value)};
   $("#cdPrev").onclick=function(){go(addDays(S.cashDay,-1))};$("#cdNext").onclick=function(){go(addDays(S.cashDay,1))};$("#cdToday").onclick=function(){go(todayISO())};
   $$("[data-cday]").forEach(function(a){a.onclick=function(e){e.preventDefault();go(a.getAttribute("data-cday"));window.scrollTo(0,0)}});
-  var tbl=$("#cashT");
-  tbl.onchange=function(e){var el=e.target,f=el.getAttribute("data-c");if(!f)return;var tr=el.closest("tr"),tab=+tr.getAttribute("data-tab"),exp=+tr.getAttribute("data-exp");
+  if($("#cLock"))$("#cLock").onclick=function(){
+    var M=cashModel(),d=S.cashDay,recs=M.recs[d]||[],own={},rec={},ab={};
+    var o=byTab(recs);Object.keys(o).forEach(function(k){own[k]=r2(o[k])});
+    recs.forEach(function(x){rec[x.id]=[x.tab,x.cash,x.check,x.zl,x.name]});
+    M.carries.forEach(function(c){if(c.to===d){(ab[c.from]=ab[c.from]||{})[c.tab]=c.v}});
+    var E=M.exp(d),exp={};Object.keys(E).forEach(function(k){exp[k]=r2(E[k])});
+    api("PUT","/cash/lock",{day:d,snap:{own:own,rec:rec,absorbed:ab,exp:exp}}).then(function(l){S.acct.locks=(S.acct.locks||[]).filter(function(x){return x.day!==d}).concat([l]);toast("Đã Lock "+mdy(d));render()}).catch(fail)};
+  if($("#cUnlock"))$("#cUnlock").onclick=function(){var d=S.cashDay;
+    api("DELETE","/cash/lock?day="+d).then(function(){S.acct.locks=(S.acct.locks||[]).filter(function(x){return x.day!==d});toast("Đã Unlock "+mdy(d));render()}).catch(fail)};
+  var host=$("#cashT")||$(".ccards");if(!host)return;
+  host.onchange=function(e){var el=e.target,f=el.getAttribute("data-c");if(!f)return;var tr=el.closest("[data-tab]"),tab=+tr.getAttribute("data-tab"),exp=+tr.getAttribute("data-exp");
     var rec=cashRec(S.cashDay,tab)||{day:S.cashDay,tab_id:tab,received:null,done:false,note:""};
     var body={day:S.cashDay,tab_id:tab,received:rec.received,done:rec.done,note:rec.note};
-    if(f==="received"){body.received=el.value===""?null:+el.value;if(el.value!==""&&!body.done){body.done=true;tr.querySelector('[data-c="done"]').checked=true}}
-    if(f==="done")body.done=el.checked;if(f==="note")body.note=el.value;
+    if(f==="received"){body.received=el.value===""?null:+el.value;body.done=body.received!=null}
+    if(f==="note")body.note=el.value;
     api("PUT","/cash",body).then(function(r){var a=S.acct.cash,i=a.indexOf(cashRec(S.cashDay,tab));if(i>=0)a[i]=r;else a.push(r);
-      tr.querySelector(".cdiff").innerHTML=diffHtml(r,exp);tr.querySelector(".cby").textContent=r.by?r.by+" · "+fmtTs(r.at):"";tr.classList.remove("dim");cashTotals()}).catch(fail)};
+      var cd=tr.querySelector(".cdiff");if(cd)cd.innerHTML=diffHtml(r,exp);var cb=tr.querySelector(".cby");if(cb)cb.textContent=r.by&&r.received!=null?r.by+" · "+fmtTs(r.at):"";tr.classList.remove("dim");cashTotals()}).catch(fail)};
 }
-function cashTotals(){if(!$("#cashTot"))return;var exp=0,got=0;$$("#cashT tr[data-tab]").forEach(function(tr){exp+=+tr.getAttribute("data-exp");var v=tr.querySelector('[data-c="received"]').value;if(v!=="")got+=+v});
-  var c=$("#cashTot").children,dt=Math.round((got-exp)*100)/100;c[5].textContent=money(got);c[6].innerHTML=dt===0?'<span class="ok">0</span>':'<span class="bad">'+money(dt)+'</span>'}
+function cashTotals(){var exp=0,got=0;$$("[data-tab][data-exp]").forEach(function(tr){var i=tr.querySelector('[data-c="received"]');if(!i)return;exp+=+tr.getAttribute("data-exp");if(i.value!=="")got+=+i.value});
+  if($("#cashGot"))$("#cashGot").textContent=money(got);
+  if(!$("#cashTot"))return;var c=$("#cashTot").children,dt=Math.round((got-exp)*100)/100;c[5].textContent=money(got);c[6].innerHTML=dt===0?'<span class="ok">0</span>':'<span class="bad">'+money(dt)+'</span>'}
 
 /* ---------- Lương ---------- */
 function calcWages(h,rate){h=+h||0;if(!rate||!h)return null;var reg=Math.min(h,OT_LIMIT),ot=Math.max(h-OT_LIMIT,0);return Math.round((reg*rate+ot*rate*OT_RATE)*100)/100}

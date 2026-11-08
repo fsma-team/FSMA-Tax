@@ -4,7 +4,8 @@ var FONTS=["Pacifico","Lobster","Comfortaa","Montserrat","Nunito","Oswald","Glor
 var STATUS=["","E-file","Accepted","Rejected","Hold","Paper Mailed","Refund"];
 var METHODS=["Cash","Check","Zelle","Venmo"];
 function mondayOf(d){var x=new Date(d.getTime());var wd=(x.getDay()+6)%7;x.setDate(x.getDate()-wd);return x.getFullYear()+"-"+("0"+(x.getMonth()+1)).slice(-2)+"-"+("0"+x.getDate()).slice(-2)}
-var S={me:null,page:"home",apptSub:"Office",setSub:"users",weekStart:mondayOf(new Date()),from:"",to:"",othersOpen:false,feeQ:"",
+function mondayISO(d){var x=new Date(d+"T12:00:00Z");var wd=(x.getUTCDay()+6)%7;return new Date(x.getTime()-wd*864e5).toISOString().slice(0,10)}
+var S={me:null,page:"home",apptSub:"Office",setSub:"users",weekStart:mondayISO(new Date().toLocaleDateString("en-CA",{timeZone:"America/Los_Angeles"})),from:"",to:"",othersOpen:false,feeQ:"",
   staff:[],users:[],rows:{},idx:{},blackouts:[],hours:{},cal:{},prep:[],notice:"",sched:[],fees:[],feeTiers:[],bookings:{},bkWeek:null,
   log:[],logLoaded:false,retire:[],emailFormats:{},fy:new Date().getFullYear()+1,season:new Date().getFullYear(),now:null,
   pYear:0,pFrom:1,pTo:12,rec:null,recLoading:false};
@@ -36,7 +37,7 @@ function api(method,path,body){
   if(body!==undefined){opt.headers["content-type"]="application/json";opt.body=JSON.stringify(body)}
   return fetch("/api"+path,opt).then(function(r){
     return r.json().catch(function(){return {}}).then(function(d){
-      if(r.status===401&&path!=="/login"&&path!=="/me"){showLogin("Phiên đăng nhập đã hết, vui lòng đăng nhập lại.");throw new ApiErr(401,d.error)}
+      if(r.status===401&&path!=="/login"&&path!=="/me"){chatSignOut();showLogin("Phiên đăng nhập đã hết, vui lòng đăng nhập lại.");throw new ApiErr(401,d.error)}
       if(!r.ok){var e=new ApiErr(r.status,d.error||"Có lỗi xảy ra");e.data=d;throw e}
       return d})
   },function(){throw new ApiErr(0,"Không có kết nối, thử lại sau")});
@@ -50,7 +51,8 @@ function myTab(){return S.me&&S.me.tab_id?tk(S.me.tab_id):""}
 function canEditTab(id){return isAdmin()||myTab()===id}
 function canBook(){return true}
 function sById(id){return S.staff.filter(function(x){return x.id===id})[0]}
-function mapTab(t){return {id:tk(t.id),dbId:t.id,name:t.name,sheetLen:t.sheet_len,theme:{color:t.color,font:t.font,title:t.title,tag:t.tagline}}}
+function shortOf(s){return (s&&(s.short||s.name))||""}
+function mapTab(t){return {id:tk(t.id),dbId:t.id,name:t.name,short:t.short_name||"",sheetLen:t.sheet_len,theme:{color:t.color,font:t.font,title:t.title,tag:t.tagline}}}
 
 /* ---------- client rows ---------- */
 function blank(i){return {id:null,pos:i,date:"",status:"",name:"",ssn:"",amt:0,method:"Cash",online:false,esign:false,paid:false,paidDate:"",note:"",tip:0,deleted:false}}
@@ -91,11 +93,11 @@ function uiBusy(){var ae=document.activeElement;return !!($("#modalHost")&&$("#m
 /* ---------- login / password / boot ---------- */
 function showLogin(msg){
   S.me=null;
-  $("#root").innerHTML='<div class="login"><div class="login-box"><div class="brand" style="margin-bottom:16px">FSMA Tax<span>Tax season</span></div><h2>Đăng nhập</h2>'+(msg?'<div class="notice">'+esc(msg)+'</div>':'')+
+  $("#root").innerHTML='<div class="login"><div class="login-box"><div class="brand" style="margin-bottom:16px">'+BRAND_SVG+'First Source<span>Tax season</span></div><h2>Đăng nhập</h2>'+(msg?'<div class="notice">'+esc(msg)+'</div>':'')+
     '<form id="lf"><label>Username</label><input type="text" id="lu" autocomplete="username" autocapitalize="none" required><label>Password</label><input type="password" id="lp" autocomplete="current-password" required><div class="err" id="le"></div><button class="btn pri" type="submit" style="width:100%;justify-content:center;padding:8px">Đăng nhập</button></form></div></div>';
   $("#lu").focus();
   $("#lf").onsubmit=function(e){e.preventDefault();$("#le").textContent="";
-    api("POST","/login",{username:$("#lu").value,password:$("#lp").value}).then(start).catch(function(er){$("#le").textContent=er.message})};
+    api("POST","/login",{username:$("#lu").value,password:$("#lp").value}).then(function(){chatSignOut();start()}).catch(function(er){$("#le").textContent=er.message})};
 }
 function showChangePw(forced){
   $("#root").innerHTML='<div class="login"><div class="login-box"><h2>Đổi mật khẩu</h2>'+(forced?'<div class="notice">Đây là lần đăng nhập đầu tiên (hoặc mật khẩu vừa được đặt lại). Vui lòng đặt mật khẩu mới, ít nhất 8 ký tự.</div>':'')+
@@ -114,7 +116,7 @@ function loadBoot(){
   api("GET","/boot").then(function(b){
     S.me=b.me;S.staff=b.tabs.map(mapTab);S.users=(b.users||[]).map(mapUser);
     var st=b.settings||{};S.notice=st.notice||"";S.hours=st.hours||{};S.cal=st.cal||{};S.prep=st.prep_list||[];S.season=st.season_year||S.season;S.fy=S.season+1;
-    S.retire=st.retirement||[["IRA","—"],["IRA 50+","—"],["401k / 403b / 457","—"],["Catch-up 50+","—"],["SIMPLE","—"]];S.emailFormats=st.email_formats||{};
+    S.retire=st.retirement||[["IRA","—"],["IRA 50+","—"],["401k / 403b / 457","—"],["Catch-up 50+","—"],["SIMPLE","—"]];S.emailFormats=st.email_formats||{};S.sms=st.sms||null;S.selfKeep=st.self_keep||null;
     S.blackouts=b.blackouts.map(function(x){return {id:x.id,date:x.date,who:x.who,note:x.note}});
     S.sched=b.sched;S.fees=b.fees;S.feeTiers=b.tiers.map(function(t){return [t[0],t[1],tierRows(t)]});S.now=b.now;buildRows(b.rows);
     S.bookings={};S.bkWeeks={};S.logLoaded=false;S.rec=null;
@@ -124,12 +126,13 @@ function loadBoot(){
   }).catch(function(e){if(e&&e.data&&e.data.must_change)showChangePw(true);else if(e.status!==401){$("#root").innerHTML='<div class="login"><div class="login-box"><h2>Không tải được dữ liệu</h2><div class="err">'+esc(e.message)+'</div><button class="btn" id="retry">Thử lại</button></div></div>';$("#retry").onclick=function(){location.reload()}}});
 }
 function mapUser(u){return {id:u.id,u:u.username,full:u.full_name,n:u.display_name,role:u.role==="admin"?"Admin":"Preparer",tab:u.tab_id?tk(u.tab_id):"",tmp:u.must_change,locked:u.locked,active:u.active}}
-function logout(){api("POST","/logout").catch(function(){}).then(function(){showLogin()})}
+function logout(){chatSignOut();api("POST","/logout").catch(function(){}).then(function(){showLogin()})}
 function buildShell(){
-  $("#root").innerHTML='<div class="topbar"><div class="inner"><div class="brand">FSMA Tax<span>Tax season '+S.fy+'</span></div>'+
+  if(isPhone()){buildPhoneShell();return}
+  $("#root").innerHTML='<div class="topbar"><div class="inner"><div class="brand">'+BRAND_SVG+'First Source<span>Tax season '+S.season+'</span></div>'+
     '<div class="gsearch"><input type="text" id="gq" placeholder="Tìm 4 số cuối SSN hoặc tên khách" autocomplete="off"><button class="btn pri" id="gbtn">Search</button></div>'+
     '<div class="userbox"><div class="welcome" id="welcome"></div><div><a href="#" id="pwLink">Đổi mật khẩu</a> · <a href="#" id="outLink" class="logout">Đăng xuất</a></div></div></div></div>'+
-    '<div class="menubar"><div class="nav" id="nav"></div></div><div class="sheets"><div class="in" id="sheets"></div></div><div class="page" id="page"></div><div id="modalHost"></div>';
+    '<div class="menubar"><div class="nav" id="nav"></div></div><div class="sheets"><div class="in" id="sheets"></div></div><div class="page" id="page"></div><div id="modalHost"></div><div id="chatHost"></div>';
   $("#pwLink").onclick=function(e){e.preventDefault();showChangePw(false)};
   $("#outLink").onclick=function(e){e.preventDefault();logout()};
   $("#gbtn").onclick=runSearch;
@@ -162,9 +165,11 @@ var APPT_POLL=10000;
 function renderNav(){
   var items=[["home","Homepage"],["fees","Fees"],["appt","Appointment"],["attn","Attention"]];
   if(isAdmin()){items.push(["reports","Reports"]);items.push(["acct","Accounting"]);items.push(["records","Records"]);items.push(["settings","Settings"])}
-  $("#nav").innerHTML=items.map(function(x){return '<button data-p="'+x[0]+'" class="'+(S.page===x[0]?'on':'')+'">'+x[1]+'</button>'}).join("");
+  if(isPhone()){renderPhoneNav();return}
+  items.push(["__chat","Chat"]);
+  $("#nav").innerHTML=items.map(function(x){return '<button data-p="'+x[0]+'" class="'+(S.page===x[0]?'on':'')+'">'+x[1]+(x[0]==="__chat"?'<i class="cbadge" id="chatBadge"'+(S.chatUnread?'':' hidden')+'>'+(S.chatUnread||"")+'</i>':'')+'</button>'}).join("");
   $("#sheets").innerHTML=S.staff.map(function(s){return '<button class="st'+(S.page===s.id?' on':'')+'" data-p="'+s.id+'" style="--c:'+(PALETTE[s.theme.color])+'">'+esc(s.name)+'</button>'}).join("")+(isAdmin()?'<button class="st add" data-p="__add" title="Chỉ Admin">+ Thêm tab</button>':'');
-  $$("[data-p]").forEach(function(b){b.onclick=function(){var k=b.getAttribute("data-p");if(k==="__add"){addStaff();return}S.page=k;render()}});
+  $$("[data-p]").forEach(function(b){b.onclick=function(){var k=b.getAttribute("data-p");if(k==="__add"){addStaff();return}if(k==="__chat"){openChat();return}S.page=k;render()}});
   $("#welcome").textContent="Welcome, "+me();
 }
 function addStaff(){
@@ -248,12 +253,13 @@ function bindRecords(){
 
 /* ================= Homepage ================= */
 function pageHome(){
-  var d=new Date(),days=["Chủ nhật","Thứ hai","Thứ ba","Thứ tư","Thứ năm","Thứ sáu","Thứ bảy"];
-  var h='<div class="page-head"><div><h1>Hello Team!</h1><div class="sub">Hôm nay là '+days[d.getDay()]+', '+("0"+(d.getMonth()+1)).slice(-2)+'/'+("0"+d.getDate()).slice(-2)+'/'+d.getFullYear()+'</div></div></div>';
+  var td=todayISO(),days=["Chủ nhật","Thứ hai","Thứ ba","Thứ tư","Thứ năm","Thứ sáu","Thứ bảy"];
+  var h='<div class="page-head"><div><h1>Hello Team!</h1><div class="sub">Hôm nay là '+days[new Date(td+"T12:00:00Z").getUTCDay()]+', '+mdy(td)+'</div></div></div>';
   h+='<div class="notice"><b>Thông báo:</b> '+esc(S.notice)+(isAdmin()?' &nbsp;<a href="#" id="editNotice">sửa</a>':'')+'</div>';
   var wait=0,n=0,tc=0,tt=0;allRows().forEach(function(x){if(bucket(x.r)==="wt"){wait+=x.r.amt;n++}if(x.r.status!=="Refund"&&x.r.name)tc++;tt+=amt(x.r)});
   var a=attn();
   if(isAdmin())h+='<div class="statbar" style="margin-bottom:28px"><div class="c"><b>'+tc+'</b><span>Total clients</span></div><div class="c"><b>'+money(tt)+'</b><span>Total Income</span></div><div class="c k-wait"><b>'+money(wait)+'</b><span>Still waiting for Online files · '+n+' files</span></div><div class="c k-att" id="goAttn"><b>'+a.total+' files</b><span>Attention · bấm để xem</span></div></div>';
+  h+=topProducersCard();
   h+='<div class="card"><h2>Informations / Tips</h2><div class="grid3" style="margin-top:6px">';
   h+=kv("Schedule C – NAICS",[["Food delivery","492000"],["Taxi / Rideshare","485300"],["Nail tech","812113"],["Hair / Barber","812112"],["Online selling","455000"],["Janitorial","561720"],["Babysitting","624410"],["Handyman","812990"],["Truck · long distance","484121"]]);
   h+='<div><h3>Tax brackets</h3><table class="t2"><tr><th></th><th class="n">Single</th><th class="n">MFJ</th><th class="n">HoH</th></tr>'+
@@ -321,7 +327,7 @@ function monOpts(sel){return MON12.map(function(m,i){return '<option value="'+(i
 function periodCtl(){return '<select id="pYear">'+[S.fy-1,S.fy,S.fy+1].map(function(y){return '<option'+(y===S.pYear?' selected':'')+'>'+y+'</option>'}).join("")+'</select> <span class="muted">từ</span> <select id="pFrom">'+monOpts(S.pFrom)+'</select> <span class="muted">đến</span> <select id="pTo">'+monOpts(S.pTo)+'</select> <button class="btn sm" id="pAll">Cả năm</button>'}
 function bindPeriod(){$("#pYear").onchange=function(){S.pYear=+this.value;applyPeriod();render()};$("#pFrom").onchange=function(){S.pFrom=+this.value;if(S.pTo<S.pFrom)S.pTo=S.pFrom;applyPeriod();render()};$("#pTo").onchange=function(){S.pTo=+this.value;if(S.pFrom>S.pTo)S.pFrom=S.pTo;applyPeriod();render()};$("#pAll").onclick=function(){S.pFrom=1;S.pTo=12;applyPeriod();render()}}
 S.recYears=[2025];S.recSub="summary";S.recMode="year";
-S.recAsOf=(function(){var d=new Date();return ("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2)})();
+S.recAsOf=new Date().toLocaleDateString("en-CA",{timeZone:"America/Los_Angeles"}).slice(5);
 var MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Later"];
 function recRows(y){var o=[],d=REC[String(y)]||{};Object.keys(d).forEach(function(p){d[p].forEach(function(r){o.push({p:p,d:r[0],a:r.slice(1)})})});
   if(S.recMode==="ytd"){var cut=(y+1)+"-"+S.recAsOf;o=o.filter(function(r){return r.d<=cut})}return o}
@@ -565,7 +571,7 @@ function refreshWeek(wk){wk=wk||S.weekStart;var me=_wkReq[wk]=(_wkReq[wk]||0)+1;
   return api("GET","/bookings?from="+wk+"&to="+addDays(wk,6)).then(function(list){if(me!==_wkReq[wk])return;var first=!S.bkWeeks[wk];S.bkWeeks[wk]=true;
     var before=bkSnap(wk);
     Object.keys(S.bookings).forEach(function(k){var d=k.split("|")[1];if(d>=wk&&d<=addDays(wk,6))delete S.bookings[k]});
-    list.forEach(function(b){S.bookings[b.cal+"|"+b.date+"|"+b.slot]={n:b.n,p:b.p,f:b.f,s:b.s,note:b.note,span:b.span,id:b.id}});
+    list.forEach(function(b){S.bookings[b.cal+"|"+b.date+"|"+b.slot]={n:b.n,p:b.p,f:b.f,s:b.s,note:b.note,span:b.span,id:b.id,sms:b.sms,tk:b.tk}});
     if((first||bkSnap(wk)!==before)&&S.page==="appt"&&S.apptSub!=="Work Schedule"&&S.weekStart===wk&&!uiBusy()&&!S._dk)renderKeep();
   }).catch(function(){})}
 /* load this week, then the weeks around it so ‹ › open instantly */
@@ -575,14 +581,14 @@ function reloadWeek(){return refreshWeek()}
 /* optimistic: show the change now, save in the background, re-sync on error */
 function localMove(ok,nk,nb){if(ok&&ok!==nk)delete S.bookings[ok];S.bookings[nk]=nb;renderKeep()}
 function apiSaveBooking(cal,day,slot,b,old){
-  return api("POST","/bookings/save",{cal:cal,day:day,slot:slot,client:b.n,phone:b.p,files:b.f,preparer:b.s||"",note:b.note||"",span:b.span||1,old:old||null});
+  return api("POST","/bookings/save",{cal:cal,day:day,slot:slot,client:b.n,phone:b.p,files:b.f,preparer:b.s||"",note:b.note||"",span:b.span||1,sms:b.sms!==false,old:old||null});
 }
 function moveBooking(ok,nk){
   var bk=S.bookings[ok],o=ok.split("|"),n=nk.split("|");if(!bk||o[0]!==n[0])return;
   var er=canPlace(n[0],n[1],n[2],Math.max(1,bk.span||1),ok);if(er){toast(er,true);return}
   if(bk.s&&!availPrep(bk.s,n[1],n[2])&&!confirm(bk.s+" không có lịch đi làm vào giờ này. Vẫn chuyển hẹn sang giờ này?"))return;
   localMove(ok,nk,Object.assign({},bk));
-  apiSaveBooking(n[0],n[1],n[2],bk,{cal:o[0],day:o[1],slot:o[2]}).then(reloadWeek).catch(function(e){fail(e);reloadWeek()});
+  apiSaveBooking(n[0],n[1],n[2],bk,{cal:o[0],day:o[1],slot:o[2]}).then(function(b){smsToast(b&&b.smsRes);reloadWeek()}).catch(function(e){fail(e);reloadWeek()});
 }
 function bindAppt(){
   $$("[data-sub]").forEach(function(b){b.onclick=function(){S.apptSub=b.getAttribute("data-sub");render()}});
@@ -600,9 +606,7 @@ function bindAppt(){
   $$("[data-bx]").forEach(function(x){
     x.onmousedown=function(e){e.stopPropagation()};
     x.onclick=function(e){e.stopPropagation();e.preventDefault();var k=x.getAttribute("data-bx"),p=k.split("|"),bk=S.bookings[k];if(!bk)return;
-      if(!confirm("Xóa hẹn "+bk.n+" ("+p[0]+" · "+mdy(p[1])+" · "+p[2]+")?"))return;
-      delete S.bookings[k];renderKeep();
-      api("DELETE","/bookings?cal="+p[0]+"&day="+p[1]+"&slot="+p[2]).then(reloadWeek).catch(function(er){fail(er);reloadWeek()})}});
+      askDeleteBooking(k,p,bk)}});
   $$(".rz").forEach(function(z){
     z.onclick=function(e){e.stopPropagation()};
     z.onpointerdown=function(e){e.stopPropagation();e.preventDefault();
@@ -630,19 +634,21 @@ function openBooking(k,p){
     '<label>Files <span class="req">*</span></label><input type="number" id="bf" min="1" value="'+esc(b.f)+'" placeholder="1">'+
     (off?'<label>Preparer</label><select id="bs"><option value="">(optional)</option>'+S.prep.map(function(o){var ok=availPrep(o,p[1],p[2]);return '<option value="'+esc(o)+'"'+(o===b.s?' selected':'')+(ok?'':' class="dim" style="color:#aaa"')+'>'+esc(o)+'</option>'}).join("")+'</select>':'')+
     '<label>Notes</label><input type="text" id="bnote" value="'+esc(b.note)+'" placeholder="(optional)">'+
+    (smsOn()?'<label></label><label class="chk"><input type="checkbox" id="bsms"'+(b.sms===false?'':' checked')+'> Text cho khách</label>':'')+
     (ex?'<label>Date</label><input type="date" id="bdt" value="'+p[1]+'"><label>Time</label><select id="btm">'+slotsFor(p[0]).map(function(x){return '<option'+(hm(x)===p[2]?' selected':'')+'>'+hm(x)+'</option>'}).join("")+'</select>':'')+
-    '</div><div class="err" id="berr"></div><div class="row-end">'+(ex?'<button class="btn del" id="bdel">Xóa hẹn</button>':'')+'<button class="btn" id="bc">Hủy</button><button class="btn pri" id="bsv">Lưu</button></div></div></div>';
+    '</div>'+(ex&&b.tk?'<div class="smsh" id="bsmsh"></div>':'')+'<div class="err" id="berr"></div><div class="row-end">'+(ex?'<button class="btn del" id="bdel">Xóa hẹn</button><span style="flex:1"></span>':'')+'<button class="btn" id="bc">Hủy</button><button class="btn pri" id="bsv">Lưu</button></div></div></div>';
+  if(ex&&b.tk)loadSmsHist(b.tk);
   $("#bc").onclick=function(){m.innerHTML=""};
   if($("#bs")){var dimSel=function(){var o=$("#bs").selectedOptions[0];$("#bs").style.color=o&&o.classList.contains("dim")?"#aaa":""};$("#bs").onchange=dimSel;dimSel()}
-  if($("#bdel"))$("#bdel").onclick=function(){api("DELETE","/bookings?cal="+p[0]+"&day="+p[1]+"&slot="+p[2]).then(function(){m.innerHTML="";delete S.bookings[k];renderKeep();reloadWeek()}).catch(fail)};
+  if($("#bdel"))$("#bdel").onclick=function(){askDeleteBooking(k,p,b,function(){m.innerHTML=""})};
   $("#bsv").onclick=function(){var n=$("#bn").value.trim(),ph=$("#bp").value.trim(),f=parseInt($("#bf").value,10);
     if(!n||!ph||!(f>0)){$("#berr").textContent="Cần điền Client name, Phone và Files.";return}
     var nd=$("#bdt")?$("#bdt").value:p[1],nt=$("#btm")?$("#btm").value:p[2],nk=p[0]+"|"+nd+"|"+nt,sp=$("#bs")?$("#bs").value:"";
-    var nb={n:titleCase(n),p:ph,f:f,s:sp,note:$("#bnote").value.trim(),span:b.span||1};
+    var nb={n:titleCase(n),p:ph,f:f,s:sp,note:$("#bnote").value.trim(),span:b.span||1,sms:$("#bsms")?$("#bsms").checked:(b.sms!==false),tk:b.tk||""};
     if(nk!==k){var er=canPlace(p[0],nd,nt,nb.span,k);if(er){$("#berr").textContent=er;return}}
     if(sp&&!availPrep(sp,nd,nt)&&!confirm(sp+" không có lịch đi làm vào giờ này. Vẫn đặt hẹn cho "+sp+"?"))return;
     var bsv=$("#bsv");bsv.disabled=true;
-    apiSaveBooking(p[0],nd,nt,nb,ex?{cal:p[0],day:p[1],slot:p[2]}:null).then(function(b){m.innerHTML="";nb.id=b&&b.id;localMove(ex?k:null,nk,nb);reloadWeek()}).catch(function(e){bsv.disabled=false;$("#berr").textContent=e.message})};
+    apiSaveBooking(p[0],nd,nt,nb,ex?{cal:p[0],day:p[1],slot:p[2]}:null).then(function(b){m.innerHTML="";nb.id=b&&b.id;nb.tk=b&&b.tk;localMove(ex?k:null,nk,nb);smsToast(b&&b.smsRes);reloadWeek()}).catch(function(e){bsv.disabled=false;$("#berr").textContent=e.message})};
 }
 
 
@@ -669,7 +675,7 @@ function apFontName2(){return apFontName()}
 function wrapFont(h){var f=APPT_FONTS.filter(function(x){return x[0]===apFontName()})[0]||APPT_FONTS[0];return '<div style="font-family:'+f[1]+'">'+h+'</div>'}
 function pageAppt(){
   var who=S.apptSub,names=["Thứ 2","Thứ 3","Thứ 4","Thứ 5","Thứ 6","Thứ 7","CN"],days=[];for(var i=0;i<7;i++)days.push(addDays(S.weekStart,i));
-  var h='<div class="page-head"><div><h1>Appointment</h1><div class="sub">Không gửi tin nhắn nhắc khách</div></div></div>';
+  var h='<div class="page-head"><div><h1>Appointment</h1><div class="sub">'+smsStatusLine()+'</div></div></div>';
   h+='<div class="sub-tabs">'+["Office","Daniel","Peter","Work Schedule"].map(function(n){return '<button class="btn'+(who===n?' on':'')+'" data-sub="'+n+'">'+n+'</button>'}).join("");
   if(who!=="Work Schedule")h+='<span style="width:16px"></span><button class="btn" id="pw">‹ Tuần trước</button><b>'+md(S.weekStart)+' – '+md(days[6])+'/'+days[6].slice(0,4)+'</b><button class="btn" id="nw">Tuần sau ›</button>'+(S.bkWeeks[S.weekStart]?'':'<span class="muted small">đang tải…</span>');
   h+='<span style="flex:1"></span><label class="small muted">Font <select id="apFont">'+APPT_FONTS.map(function(f){return '<option value="'+f[0]+'"'+(f[0]===apFontName()?' selected':'')+' style="font-family:'+f[1]+'">'+f[0]+'</option>'}).join("")+'</select></label></div>';
@@ -691,7 +697,7 @@ function pageAppt(){
   return wrapFont(h+'</table></div>');
 }
 function pageSchedule(){
-  var dk=["mon","tue","wed","thu","fri","sat","sun"],dn=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],today=new Date().toISOString().slice(0,10);
+  var dk=["mon","tue","wed","thu","fri","sat","sun"],dn=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],today=todayISO();
   var h='<div class="sync"><span class="pill">Lịch đi làm của tax</span><span class="muted small">'+(isAdmin()?'Admin sửa ở Settings &gt; Work Schedule':'Chỉ xem · Admin sửa ở Settings')+'</span></div>';
   var nextDone=false;
   S.sched.slice().sort(function(a,b){return a.start<b.start?-1:1}).forEach(function(p){
@@ -708,7 +714,7 @@ function saveSched(){later("sched",function(){api("PUT","/sched",{periods:S.sche
 function saveFees(){later("fees",function(){api("PUT","/fees",{fees:S.fees,tiers:S.feeTiers}).catch(fail)},600)}
 function putSetting(key,value){return api("PUT","/settings/"+key,{value:value}).catch(fail)}
 function pageSettings(){
-  var subs=[["users","Users & quyền"],["tabs","Tab nhân viên"],["appt","Appointment & Blackout"],["sched","Work Schedule"],["fees","Fees"],["log","Activity log"],["backup","Backup"]];
+  var subs=[["users","Users & quyền"],["tabs","Tab nhân viên"],["appt","Appointment & Blackout"],["sched","Work Schedule"],["fees","Fees"],["sms","Customer messages"],["log","Activity log"],["backup","Backup"]];
   var h='<div class="page-head"><div><h1>Settings</h1><div class="sub">Chỉ Admin thấy mục này</div></div></div><div class="card" style="margin-bottom:20px"><h3 style="margin-bottom:6px">Thông báo trên Homepage</h3><input type="text" id="nt" value="'+esc(S.notice)+'" style="width:min(640px,100%)"> <button class="btn pri" id="nsv">Lưu</button></div><div class="sub-tabs">'+subs.map(function(x){return '<button class="btn'+(S.setSub===x[0]?' on':'')+'" data-ss="'+x[0]+'">'+x[1]+'</button>'}).join("")+'</div>';
   if(S.setSub==="users"){
     h+='<p class="muted small">Mỗi người có username riêng của tax.fsma.team. Mật khẩu tạm là 12345, mỗi người phải đổi ở lần đăng nhập đầu. Ngọc và Nina dùng chung tab Ngọc.</p><div class="wrap"><table class="t2"><tr><th>Username</th><th>Tên đầy đủ</th><th>Tên hiển thị</th><th>Quyền</th><th>Tab hồ sơ</th><th>Trạng thái</th><th></th></tr>'+
@@ -717,8 +723,8 @@ function pageSettings(){
     '<p class="muted small">Admin: Settings, đổi tên/thêm/xóa tab, xem log và Records, sửa mọi tab · Preparer: sửa tab của mình, đặt hẹn, tìm khách. Ai cũng sửa được banner (tiêu đề, màu, font) của mọi tab. 5 lần nhập sai mật khẩu thì khóa 15 phút (tăng dần), Admin mở khóa ở đây.</p>';
   }
   if(S.setSub==="tabs"){
-    h+='<p class="muted small">Chỉ Admin được đổi tên, thêm, xóa, sắp xếp tab. Nhân viên tự chỉnh màu/font/tiêu đề tab của mình bằng nút Sửa banner.</p><div class="wrap"><table class="t2"><tr><th>Thứ tự</th><th>Tên tab</th><th>Màu</th><th>Tiêu đề banner</th><th class="n">Hồ sơ</th><th></th></tr>'+
-    S.staff.map(function(s,i){return '<tr><td><button class="btn sm" data-up="'+i+'">↑</button> <button class="btn sm" data-dn="'+i+'">↓</button></td><td><input type="text" data-sn="'+i+'" value="'+esc(s.name)+'" style="width:130px"></td><td><span class="sw" style="background:'+PALETTE[s.theme.color]+';cursor:default"></span> '+s.theme.color+'</td><td>'+esc(s.theme.title)+'</td><td class="n">'+live(s.id).length+'</td><td><button class="btn sm del" data-sx="'+i+'">Xóa tab</button></td></tr>'}).join("")+'</table></div><p><button class="btn pri" id="addS">+ Thêm tab nhân viên</button> <span class="muted small">Xóa tab = ẩn tab, dữ liệu vẫn còn trong database.</span></p>';
+    h+='<p class="muted small">Chỉ Admin được đổi tên, thêm, xóa, sắp xếp tab. Nhân viên tự chỉnh màu/font/tiêu đề tab của mình bằng nút Sửa banner.</p><div class="wrap"><table class="t2"><tr><th>Thứ tự</th><th>Tên tab</th><th>Tên ngắn</th><th>Màu</th><th>Tiêu đề banner</th><th class="n">Hồ sơ</th><th></th></tr>'+
+    S.staff.map(function(s,i){return '<tr><td><button class="btn sm" data-up="'+i+'">↑</button> <button class="btn sm" data-dn="'+i+'">↓</button></td><td><input type="text" data-sn="'+i+'" value="'+esc(s.name)+'" style="width:130px"></td><td><input type="text" data-ssh="'+i+'" value="'+esc(s.short)+'" placeholder="'+esc(s.name)+'" style="width:110px"></td><td><span class="sw" style="background:'+PALETTE[s.theme.color]+';cursor:default"></span> '+s.theme.color+'</td><td>'+esc(s.theme.title)+'</td><td class="n">'+live(s.id).length+'</td><td><button class="btn sm del" data-sx="'+i+'">Xóa tab</button></td></tr>'}).join("")+'</table></div><p><button class="btn pri" id="addS">+ Thêm tab nhân viên</button> <span class="muted small">Xóa tab = ẩn tab, dữ liệu vẫn còn trong database.</span></p>';
   }
   if(S.setSub==="appt"){
     h+='<div class="grid2"><div><h3>Giờ nhận hẹn Office</h3><table class="t2"><tr><th>Ngày</th><th>Từ</th><th>Hẹn cuối</th><th>Nghỉ</th></tr>'+
@@ -726,7 +732,7 @@ function pageSettings(){
     '<div><h3>Blackout</h3><table class="t2"><tr><th>Ngày</th><th>Áp dụng</th><th>Ghi chú</th><th></th></tr>'+S.blackouts.map(function(b){return '<tr><td>'+mdy(b.date)+'</td><td>'+(b.who==="all"?"Tất cả":b.who)+'</td><td>'+esc(b.note)+'</td><td><button class="btn sm del" data-bx="'+b.id+'">×</button></td></tr>'}).join("")+'</table><p><input type="date" id="bd"> <select id="bw"><option value="all">Tất cả</option><option>Office</option><option>Daniel</option><option>Peter</option></select> <input type="text" id="bnt" placeholder="Ghi chú" style="width:130px"> <button class="btn pri" id="bad">Thêm</button></p></div></div>'+
     '<h3 style="margin-top:22px">Giờ từng lịch</h3><table class="t2" style="max-width:560px"><tr><th>Lịch</th><th>Slot đầu</th><th>Hẹn cuối</th><th>Mỗi slot</th></tr>'+["Office","Daniel","Peter"].map(function(w){var c=S.cal[w];return '<tr><td>'+w+'</td><td><input type="time" data-cs="'+w+'" value="'+c.start+'"></td><td><input type="time" data-ce="'+w+'" value="'+c.last+'"></td><td><select data-cl="'+w+'"><option value="30"'+(c.step===30?' selected':'')+'>30 phút</option><option value="60"'+(c.step===60?' selected':'')+'>1 giờ</option></select></td></tr>'}).join("")+'</table>'+
     '<h3 style="margin-top:22px">Danh sách Preparer khi đặt hẹn Office</h3><input type="text" id="prl" value="'+esc(S.prep.join(", "))+'" style="width:min(420px,100%)"> <button class="btn" id="prs">Lưu</button> <span class="muted small">Cách nhau bằng dấu phẩy</span>'+
-    '<p class="muted small">Appointment không có nhắc khách bằng tin nhắn nên không có mục Text.</p>';
+    '<p class="muted small">Tin nhắn cho khách: Settings &gt; Customer messages.</p>';
   }
   var a=h.length;
   return h+SETTINGS_REST();
@@ -735,6 +741,7 @@ function SETTINGS_REST(){
   var h="";
   if(S.setSub==="sched"){h+=schedSettings()}
   if(S.setSub==="fees"){h+=feesSettings()}
+  if(S.setSub==="sms"){h+=smsSettings()}
   if(S.setSub==="log"){
     h+='<p class="muted small">Ghi lại: mọi thay đổi trên hồ sơ đã Accepted và mọi lần xóa hồ sơ (ai, lúc nào, trước → sau). Chỉ Admin xem được.</p>'+(S.logLoaded?'<div class="wrap"><table class="t2 log"><tr><th>Thời gian</th><th>Ai</th><th>Tab</th><th>Nội dung</th><th></th></tr>'+
     S.log.map(function(e){return '<tr><td style="white-space:nowrap">'+fmtTs(e.at)+'</td><td>'+esc(e.user)+'</td><td>'+esc(e.tab)+'</td><td>'+(e.kind==="delete"?'<span class="red">Xóa</span> ':'')+esc(e.text.replace(/^Xóa: /,""))+'</td><td>'+(e.kind==="delete"?(e.restored?'<span class="muted small">đã khôi phục</span>':'<button class="btn sm" data-rs="'+e.id+'">Khôi phục</button>'):'')+'</td></tr>'}).join("")+'</table></div>':'<div class="muted">Đang tải…</div>');
@@ -787,6 +794,8 @@ function bindSettings(){
   $$("[data-up]").forEach(function(e){e.onclick=function(){var i=+e.getAttribute("data-up");if(i>0)reorder(i,i-1)}});
   $$("[data-dn]").forEach(function(e){e.onclick=function(){var i=+e.getAttribute("data-dn");if(i<S.staff.length-1)reorder(i,i+1)}});
   if($("#addS"))$("#addS").onclick=addStaff;
+  $$("[data-ssh]").forEach(function(e){e.onchange=function(){var s=S.staff[+e.getAttribute("data-ssh")];api("PATCH","/tabs/"+s.dbId,{short_name:e.value.trim()}).then(function(o){s.short=o.short_name||"";render()}).catch(function(er){fail(er);render()})}});
+  if(S.setSub==="sms")bindSmsSettings();
   /* appointment settings */
   var saveHours=function(){putSetting("hours",S.hours)};
   $$("[data-hx]").forEach(function(e){e.onchange=function(){S.hours[e.getAttribute("data-hx")]=e.checked?null:["09:00","18:00"];saveHours();render()}});
@@ -821,10 +830,11 @@ function loadLog(){api("GET","/log").then(function(l){S.log=l;S.logLoaded=true;i
 function render(){
   if(!S.me)return;
   if(!isAdmin()&&(S.page==="settings"||S.page==="reports"||S.page==="records"||S.page==="acct"))S.page="home";
-  if(!sById(S.page)&&["home","fees","appt","attn","reports","acct","records","settings","search"].indexOf(S.page)<0)S.page="home";
+  if(!sById(S.page)&&["home","fees","appt","attn","reports","acct","records","settings","search","psearch"].indexOf(S.page)<0)S.page="home";
   renderNav();
   var p=S.page,pg=$("#page"),h;
-  pg.className="page"+((p==="appt"||sById(p)||p==="attn"||p==="records"||p==="search")?" wide":"");
+  if(isPhone()&&phoneRender(p,pg))return;
+  pg.className="page"+(isPhone()?" phone":"")+((p==="appt"||sById(p)||p==="attn"||p==="records"||p==="search")?" wide":"");
   if(p==="appt"&&S.apptSub!=="Work Schedule")ensureWeeks();
   if(p==="records"&&!S.rec){
     pg.innerHTML='<div class="muted">Đang tải Records…</div>';
@@ -851,9 +861,10 @@ function render(){
     else $("#feeQ").oninput=function(){S.feeQ=this.value;var pos=this.selectionStart;render();var el=$("#feeQ");el.focus();el.setSelectionRange(pos,pos)};
   }
   if(p==="home"){
+    bindTopProducers();
     if($("#goAttn"))$("#goAttn").onclick=function(){S.page="attn";render()};
     if($("#pYear"))bindPeriod();bindHomeTips();
     $$(".oth").forEach(function(e){e.onclick=function(){S.othersOpen=!S.othersOpen;render()}});
   }
 }
-start();
+/* start() is called at the end of v17.js */

@@ -4,6 +4,7 @@ import {
   db, json, HttpError, requireUser, requireAdmin, createSession, cookieHeader, env,
   s, isoDate, num, bool, nameKey, todayLA, hhmm, toMin,
 } from '../lib/core.mjs';
+import { smsCfg, checkSms, fill, fmtDay, fmtDayLong, fmtHour, linkOf, linkData, newBookToken, laNow, inSeason, queueSms, sendOne, sendAtFor, shortName, siteUrl } from '../lib/sms.mjs';
 
 const STATUS = ['', 'E-file', 'Accepted', 'Rejected', 'Hold', 'Paper Mailed', 'Refund'];
 const METHODS = ['Cash', 'Check', 'Zelle', 'Venmo'];
@@ -103,6 +104,11 @@ function checkSetting(key, v) {
       o[i] = [h[0], h[1]];
     }
     return o;
+  }
+  if (key === 'sms') return checkSms(v);
+  if (key === 'self_keep') {
+    if (!Array.isArray(v) || v.length > 20) throw new HttpError(400, 'Bad list');
+    return v.map((x) => String(x).trim().slice(0, 40)).filter(Boolean);
   }
   if (key === 'cal') {
     const o = {};
@@ -256,7 +262,7 @@ async function listRows(url) {
 }
 
 // ---------- tabs ----------
-const tabOut = (t) => ({ id: t.id, name: t.name, color: t.color, font: t.font, title: t.title, tagline: t.tagline, sort: t.sort, sheet_len: t.sheet_len });
+const tabOut = (t) => ({ id: t.id, name: t.name, short_name: t.short_name || '', color: t.color, font: t.font, title: t.title, tagline: t.tagline, sort: t.sort, sheet_len: t.sheet_len });
 
 async function createTab(user, body) {
   requireAdmin(user);
@@ -271,13 +277,14 @@ async function updateTab(user, id, body) {
   const sql = db();
   const [t] = await sql`select * from staff_tabs where id=${id} and deleted_at is null`;
   if (!t) throw new HttpError(404, 'Tab not found');
-  if (body.name !== undefined) requireAdmin(user);       // only Admin renames a tab; anyone edits the banner
+  if (body.name !== undefined || body.short_name !== undefined) requireAdmin(user);       // only Admin renames a tab; anyone edits the banner
   const name = body.name !== undefined ? (s(body.name, 40) || t.name) : t.name;
   const color = body.color !== undefined ? (COLORS.includes(body.color) ? body.color : (() => { throw new HttpError(400, 'Bad color'); })()) : t.color;
   const font = body.font !== undefined ? (FONTS.includes(body.font) ? body.font : (() => { throw new HttpError(400, 'Bad font'); })()) : t.font;
   const title = body.title !== undefined ? (s(body.title, 60) || name) : t.title;
   const tagline = body.tagline !== undefined ? (s(body.tagline, 120) || '') : t.tagline;
-  const [u] = await sql`update staff_tabs set name=${name}, color=${color}, font=${font}, title=${title}, tagline=${tagline} where id=${id} returning *`;
+  const short = body.short_name !== undefined ? (s(body.short_name, 30) || '') : (t.short_name || '');
+  const [u] = await sql`update staff_tabs set name=${name}, short_name=${short}, color=${color}, font=${font}, title=${title}, tagline=${tagline} where id=${id} returning *`;
   return tabOut(u);
 }
 async function orderTabs(user, body) {
@@ -369,7 +376,31 @@ async function delBlackout(user, id) {
 }
 
 // ---------- bookings ----------
-const bookOut = (b) => ({ id: Number(b.id), cal: b.cal, date: b.day, slot: b.slot, span: b.span, n: b.client, p: b.phone, f: b.files, s: b.preparer, note: b.note });
+const bookOut = (b) => ({ id: Number(b.id), cal: b.cal, date: b.day, slot: b.slot, span: b.span, n: b.client, p: b.phone, f: b.files, s: b.preparer, note: b.note, sms: b.sms !== false, tk: b.token || '' });
+
+// v17: customer link + text message after a booking is saved / moved / cancelled
+async function linkUpsert(sql, b, status) {
+  if (!b.token) return;
+  await sql`insert into booking_links (token, data, status, appt_at, updated_at)
+    values (${b.token}, ${sql.json(linkData(b))}, ${status}, ((${b.day}::date + ${b.slot}::time) at time zone 'America/Los_Angeles'), now())
+    on conflict (token) do update set data=excluded.data, status=excluded.status, appt_at=excluded.appt_at, updated_at=now()`;
+}
+async function bookingSms(sql, user, kind, b) {
+  if (!b.token) return 'off';
+  const st = await getSettings(sql);
+  const cfg = smsCfg(st);
+  if (!cfg.on || !cfg[kind]?.on || b.sms === false) return 'off';
+  if (!inSeason(cfg, laNow().date)) return 'off';
+  const [{ future }] = await sql`select ((${b.day}::date + ${b.slot}::time) at time zone 'America/Los_Angeles') > now() as future`;
+  if (!future) return 'off';
+  const body = fill(cfg[kind].text, { business: cfg.business, date: fmtDay(b.day), hour: fmtHour(b.slot), link: linkOf(b.token), name: shortName(b.client), preparer: b.cal !== 'Office' ? b.cal : b.preparer });
+  const sendAt = await sendAtFor(sql, cfg);
+  const q = await queueSms(sql, { token: b.token, kind, phone: b.phone, body, sendAt, by: user.display_name });
+  if (!q) return 'off';
+  if (q.skipped) return 'skipped';
+  if (!q.due) return 'queued';
+  return (await sendOne(sql, q.id)) || 'queued';
+}
 async function listBookings(url) {
   const from = isoDate(url.searchParams.get('from')), to = isoDate(url.searchParams.get('to'));
   if (!from || !to) throw new HttpError(400, 'from and to are required');
@@ -388,7 +419,8 @@ async function saveBooking(user, body) {
   const prep = cal === 'Office' ? (s(body.preparer, 40) || '') : '';
   const note = s(body.note, 200) || '';
   const old = body.old && body.old.cal ? { cal: body.old.cal, day: isoDate(body.old.day), slot: String(body.old.slot) } : null;
-  return sql.begin(async (t) => {
+  let prev = null;
+  const saved = await sql.begin(async (t) => {
     const st = await getSettings(t);
     const c = st.cal?.[cal];
     if (!c) throw new HttpError(400, 'Calendar is not set up');
@@ -415,20 +447,104 @@ async function saveBooking(user, body) {
       const oi = slots.indexOf(o.slot);
       for (let i = oi; i < oi + o.span; i++) if (mine.has(i)) throw new HttpError(400, 'Không đủ chỗ ở khung giờ đó.');
     }
+    if (old) { [prev] = await t`select * from bookings where cal=${old.cal} and day=${old.day} and slot=${old.slot}`; }
     if (old) await t`delete from bookings where cal=${old.cal} and day=${old.day} and slot=${old.slot}`;
-    const [b] = await t`insert into bookings (cal,day,slot,span,client,phone,files,preparer,note,created_by)
-      values (${cal},${day},${slot},${span},${client},${phone},${files},${prep},${note},${user.display_name})
+    const moved = !prev || prev.cal !== cal || prev.day !== day || prev.slot !== slot;
+    const token = prev?.token || newBookToken();
+    const sms = body.sms === undefined ? (prev ? prev.sms : true) : bool(body.sms);
+    const schedAt = moved ? new Date() : prev.sched_at;
+    const [b] = await t`insert into bookings (cal,day,slot,span,client,phone,files,preparer,note,created_by,token,sms,sched_at)
+      values (${cal},${day},${slot},${span},${client},${phone},${files},${prep},${note},${user.display_name},${token},${sms},${schedAt})
       on conflict (cal,day,slot) do update set span=excluded.span, client=excluded.client, phone=excluded.phone, files=excluded.files,
-        preparer=excluded.preparer, note=excluded.note, updated_at=now()
+        preparer=excluded.preparer, note=excluded.note, updated_at=now(), token=excluded.token, sms=excluded.sms, sched_at=excluded.sched_at
       returning *`;
-    return bookOut(b);
+    return { b, moved };
   });
+  const { b, moved } = saved;
+  let smsRes = 'off';
+  try {
+    await linkUpsert(sql, b, prev ? (moved ? 'updated' : (await sql`select status from booking_links where token=${b.token}`)[0]?.status || 'ok') : 'ok');
+    if (moved) smsRes = await bookingSms(sql, user, prev ? 'updated' : 'created', b);
+  } catch (e) { console.error('sms', e); smsRes = 'failed'; }
+  return { ...bookOut(b), smsRes };
 }
-async function deleteBooking(url) {
+async function deleteBooking(user, url) {
   const cal = url.searchParams.get('cal'), day = isoDate(url.searchParams.get('day')), slot = url.searchParams.get('slot');
   if (!CALS.includes(cal) || !day || !slot) throw new HttpError(400, 'Bad request');
-  await db()`delete from bookings where cal=${cal} and day=${day} and slot=${slot}`;
-  return { ok: true };
+  const sql = db();
+  const [b] = await sql`delete from bookings where cal=${cal} and day=${day} and slot=${slot} returning *`;
+  let smsRes = 'off';
+  if (b && b.token) {
+    try {
+      await linkUpsert(sql, b, 'cancelled');
+      if (url.searchParams.get('sms') !== '0') smsRes = await bookingSms(sql, user, 'cancelled', b);
+    } catch (e) { console.error('sms', e); smsRes = 'failed'; }
+  }
+  return { ok: true, smsRes };
+}
+
+// ---------- v17: customer page (no login) ----------
+function hoursLines(p) {
+  if (!p) return [];
+  return [`Mon–Fri ${p.hours_week || '—'}`, `Sat ${p.hours_sat || 'closed'}`, `Sun ${p.hours_sun || 'closed'}`];
+}
+async function publicBooking(token, ics) {
+  if (!/^[A-Za-z0-9]{6,20}$/.test(token)) throw new HttpError(404, 'Not found');
+  const sql = db();
+  const [l] = await sql`select *, appt_at < now() - interval '7 days' as expired from booking_links where token=${token}`;
+  if (!l) throw new HttpError(404, 'Not found');
+  const cfg = smsCfg(await getSettings(sql));
+  if (l.expired) return { expired: true, business: cfg.business, phone: cfg.phone, email: cfg.email };
+  const d = l.data;
+  const [p] = await sql`select * from sched_periods where ${d.day} between start_date and end_date order by start_date limit 1`;
+  if (ics) {
+    const st = new Date(l.appt_at); const en = new Date(st.getTime() + 60 * 60000);
+    const z = (x) => x.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+    const esc2 = (x) => String(x).replace(/[\\;,]/g, (c) => '\\' + c);
+    const body = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//First Source//Tax//EN', 'BEGIN:VEVENT', `UID:${token}@tax.fsma.team`, `DTSTAMP:${z(new Date())}`,
+      `DTSTART:${z(st)}`, `DTEND:${z(en)}`, `SUMMARY:${esc2(cfg.business + ' - tax appointment')}`, `LOCATION:${esc2(cfg.address)}`,
+      `DESCRIPTION:${esc2('Questions: ' + cfg.phone + ' / ' + cfg.email)}`, 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+    return new Response(body, { status: 200, headers: { 'content-type': 'text/calendar; charset=utf-8', 'content-disposition': `attachment; filename="appointment.ics"`, 'cache-control': 'no-store', 'x-robots-tag': 'noindex' } });
+  }
+  return {
+    status: l.status, business: cfg.business, phone: cfg.phone, email: cfg.email, address: cfg.address, bring: cfg.bring,
+    name: d.name, day: d.day, date: fmtDayLong(d.day), hour: fmtHour(d.slot), with: d.with || '', files: d.files, hours: hoursLines(p),
+  };
+}
+
+// ---------- v17: text message log / test (Admin) ----------
+async function smsLog(user, url) {
+  const sql = db();
+  const token = url.searchParams.get('token');
+  if (token) return (await sql`select kind, status, error, send_at, sent_at, created_at from sms_log where token=${token} order by id`).map((r) => ({ kind: r.kind, status: r.status, error: r.error, at: r.sent_at || r.send_at }));
+  requireAdmin(user);
+  const rows = await sql`select l.*, b.data->>'name' as cname from sms_log l left join booking_links b on b.token=l.token order by l.id desc limit 300`;
+  const [cnt] = await sql`select count(*) filter (where status in ('sent','demo') and sent_at >= date_trunc('month', now()))::int as month,
+      count(*) filter (where status in ('sent','demo'))::int as total from sms_log`;
+  return { counts: cnt, demo: !env('TWILIO_SID'), rows: rows.map((r) => ({ id: Number(r.id), kind: r.kind, to: r.to_phone.replace(/^\+1(\d{3})(\d{3})(\d{4})$/, '$1-$2-$3'), name: r.cname || '', body: r.body, status: r.status, error: r.error, at: r.sent_at || r.send_at, by: r.created_by })) };
+}
+async function smsTest(user, body) {
+  requireAdmin(user);
+  const sql = db();
+  const cfg = smsCfg(await getSettings(sql));
+  const kind = ['created', 'updated', 'cancelled', 'reminder'].includes(body.kind) ? body.kind : 'created';
+  const day = laNow().date;
+  const text = fill(cfg[kind].text, { business: cfg.business, date: fmtDay(day), hour: fmtHour('10:00'), link: siteUrl() + '/b/TEST', name: 'Test', preparer: '' });
+  const q = await queueSms(sql, { token: null, kind: 'test', phone: body.phone, body: text, by: user.display_name });
+  if (!q || q.skipped) throw new HttpError(400, 'Số điện thoại không đúng (cần 10 số)');
+  const r = await sendOne(sql, q.id);
+  const [m] = await sql`select status, error from sms_log where id=${q.id}`;
+  return { result: r, status: m.status, error: m.error };
+}
+
+// ---------- v17: Lock day (Accounting > Cash cuối ngày) ----------
+async function lockDay(user, body) {
+  const day = isoDate(body.day); if (!day) throw new HttpError(400, 'Bad day');
+  const snap = body.snap && typeof body.snap === 'object' ? body.snap : {};
+  if (JSON.stringify(snap).length > 200000) throw new HttpError(400, 'Too big');
+  const [r] = await db()`insert into cash_locks (day, locked_at, locked_by, snap) values (${day}, now(), ${user.display_name}, ${db().json(snap)})
+    on conflict (day) do update set locked_at=now(), locked_by=excluded.locked_by, snap=excluded.snap returning *`;
+  return { day: r.day, at: r.locked_at, by: r.locked_by, snap: r.snap };
 }
 
 // ---------- schedule ----------
@@ -562,7 +678,9 @@ async function getAcct() {
   const staff = await sql`select * from pay_staff order by sort, id`;
   const periods = await sql`select * from pay_periods order by start_date, id`;
   const rows = await sql`select * from pay_rows`;
+  const locks = await sql`select * from cash_locks order by day`.catch(() => []);
   return {
+    locks: locks.map((l) => ({ day: l.day, at: l.locked_at, by: l.locked_by, snap: l.snap })),
     cash: cash.map((c) => ({ day: c.day, tab_id: c.tab_id, received: n2(c.received), done: c.done, note: c.note, by: c.updated_by, at: c.updated_at })),
     staff: staff.map(payStaffOut),
     periods: periods.map(periodOut),
@@ -702,7 +820,11 @@ const routes = [
   ['DELETE', '/blackouts/:id', (x) => delBlackout(x.user, x.id)],
   ['GET', '/bookings', (x) => listBookings(x.url)],
   ['POST', '/bookings/save', (x) => saveBooking(x.user, x.body)],
-  ['DELETE', '/bookings', (x) => deleteBooking(x.url)],
+  ['DELETE', '/bookings', (x) => deleteBooking(x.user, x.url)],
+  ['GET', '/sms/log', (x) => smsLog(x.user, x.url)],
+  ['POST', '/sms/test', (x) => smsTest(x.user, x.body)],
+  ['PUT', '/cash/lock', async (x) => { requireAdmin(x.user); return lockDay(x.user, x.body); }],
+  ['DELETE', '/cash/lock', async (x) => { requireAdmin(x.user); const d = isoDate(x.url.searchParams.get('day')); if (!d) throw new HttpError(400, 'Bad day'); await db()`delete from cash_locks where day=${d}`; return { ok: true }; }],
   ['PUT', '/sched', (x) => putSched(x.user, x.body)],
   ['PUT', '/fees', (x) => putFees(x.user, x.body)],
   ['PUT', '/prefs', (x) => putPrefs(x.user, x.body)],
@@ -733,6 +855,8 @@ export default async function handler(req) {
     if (req.method !== 'GET' && req.headers.get('x-tax') !== '1') throw new HttpError(403, 'Bad request');
     if (path === '/login' && req.method === 'POST') return await login(req);
     if (path === '/health' && req.method === 'GET') return await health();
+    const pm = path.match(/^\/public\/b\/([^/]+)(\/ics)?$/);
+    if (pm && req.method === 'GET') { const out = await publicBooking(pm[1], !!pm[2]); return out instanceof Response ? out : json(out, 200, { 'x-robots-tag': 'noindex' }); }
     if (path === '/logout' && req.method === 'POST') {
       try { const u = await requireUser(req); await db()`delete from sessions where token_hash=${u.token_hash}`; } catch { /* already out */ }
       return json({ ok: true }, 200, { 'set-cookie': cookieHeader('x', 0) });

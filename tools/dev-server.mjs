@@ -5,7 +5,7 @@ import path from 'node:path';
 import handler from '../netlify/functions/api.mjs';
 
 const root = path.resolve('public');
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
+const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json' };
 http.createServer(async (req, res) => {
   if (req.url.startsWith('/api/')) {
     const chunks = []; for await (const c of req) chunks.push(c);
@@ -16,7 +16,7 @@ http.createServer(async (req, res) => {
     res.writeHead(r.status, h); res.end(Buffer.from(await r.arrayBuffer()));
     return;
   }
-  let p = path.join(root, decodeURIComponent(req.url.split('?')[0]));
+  let p = path.join(root, /^\/b\//.test(req.url) ? 'book.html' : decodeURIComponent(req.url.split('?')[0]));
   if (!p.startsWith(root)) { res.writeHead(403); return res.end(); }
   if (fs.existsSync(p) && fs.statSync(p).isDirectory()) p = path.join(p, 'index.html');
   if (!fs.existsSync(p)) { res.writeHead(404); return res.end('not found'); }
