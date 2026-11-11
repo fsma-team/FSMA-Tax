@@ -1,4 +1,4 @@
-/* v17: Top producers, Chat (Pub Club), text messages to customers, phone layout.
+/* v17: Top producers, text messages to customers, phone layout.
    Uses globals from app.js / acct.js. start() is called at the very end of this file. */
 var BRAND_SVG='<svg class="logo" viewBox="0 0 32 32" width="22" height="22" aria-hidden="true"><path d="M16 3.2 28 10.6V27a1.8 1.8 0 0 1-1.8 1.8H5.8A1.8 1.8 0 0 1 4 27V10.6Z" fill="none" stroke="#1b6a9c" stroke-width="2.6" stroke-linejoin="round"/><path d="M11.6 28.8V19.4a4.4 4.4 0 0 1 8.8 0v9.4" fill="none" stroke="#1b6a9c" stroke-width="2.6"/></svg>';
 var PHONE_MQ=window.matchMedia("(max-width: 760px)");
@@ -40,50 +40,7 @@ function topProducersCard(){
 }
 function bindTopProducers(){}
 
-/* ================= Chat (Pub Club Chat inside Tax) ================= */
-var CHAT_URL=lsGet("taxChatUrl")||"https://pb.fsma.team/chat-tax.html";
-var CHAT_ORIGIN=(function(){try{return new URL(CHAT_URL).origin}catch(e){return ""}})();
-S.chatUnread=0;S.chatOpen=false;
-function chatSignOut(){
-  lsSet("taxChatReset","1");
-  var f=$("#chatFrame");if(f){try{f.contentWindow.postMessage({pbtax:1,t:"logout"},CHAT_ORIGIN)}catch(e){}setTimeout(function(){var h=$("#chatHost");if(h)h.innerHTML=""},300)}
-  S.chatOpen=false;setUnread(0);
-}
-function setUnread(n){S.chatUnread=n;$$(".cbadge").forEach(function(b){b.textContent=n||"";b.hidden=!n})}
-window.addEventListener("message",function(e){if(e.origin!==CHAT_ORIGIN||!e.data||!e.data.pbtax)return;
-  if(e.data.t==="unread")setUnread(+e.data.n||0);
-  if(e.data.t==="ready")lsSet("taxChatReset",null)});
-/* mode: "page" = big Chat page (same as pb.fsma.team), "dock" = small window at the bottom right, phone = full screen */
-S.chatMode="";
-function ensureChatFrame(){
-  var host=$("#chatHost");if(!host)return false;
-  if(!$("#chatFrame")){
-    var reset=lsGet("taxChatReset")==="1";
-    host.innerHTML='<div class="cdock" id="cdock" hidden><div class="cdock-h"><b>Chat</b><span style="flex:1"></span><button class="cso" id="cdOut" title="Sign out khỏi Chat (tài khoản Pub Club)">Sign out</button><button class="btn sm" id="cdBig" title="Mở trang Chat lớn">⤢</button><button class="btn sm" id="cdX" title="Thu nhỏ">–</button></div>'+
-      '<div class="cbody"><iframe id="chatFrame" title="Chat" src="'+esc(CHAT_URL+(reset?"?reset=1":""))+'" allow="clipboard-write"></iframe></div></div>';
-    $("#cdX").onclick=closeChat;$("#cdOut").onclick=chatOnlySignOut;$("#cdBig").onclick=function(){S.page="chat";render()};
-  }
-  return true;
-}
-function chatLayout(){
-  var d=$("#cdock");if(!d)return;
-  var slot=$("#chatSlot");
-  if(slot&&!isPhone()){slot.style.height=Math.max(420,window.innerHeight-slot.getBoundingClientRect().top-14)+"px";var r=slot.getBoundingClientRect();d.className="cdock big";d.style.top=(r.top+window.scrollY)+"px";d.style.left=(r.left+window.scrollX)+"px";d.style.width=r.width+"px";d.style.height=r.height+"px";d.hidden=false;S.chatMode="page";var fb=$("#chatFab");if(fb)fb.hidden=true;return}
-  d.style.top=d.style.left=d.style.width=d.style.height="";d.className="cdock";
-  d.hidden=!S.chatOpen;S.chatMode=S.chatOpen?(isPhone()?"phone":"dock"):"";
-  var fab=$("#chatFab");if(fab)fab.hidden=S.chatOpen||isPhone();
-}
-window.addEventListener("resize",function(){if(S.me)chatLayout()});
-function chatOnlySignOut(){var f=$("#chatFrame");if(f){try{f.contentWindow.postMessage({pbtax:1,t:"logout"},CHAT_ORIGIN)}catch(e){}}setUnread(0)}
-function chatPage(){return '<div class="chatslot" id="chatSlot"></div>'}
-function openChat(){if(!ensureChatFrame())return;S.chatOpen=true;chatLayout();if(isPhone())renderPhoneNav()}
-function closeChat(){S.chatOpen=false;chatLayout();if(isPhone())renderPhoneNav()}
-function afterRender(){
-  if(!isPhone()&&!$("#chatFab")&&$("#chatHost"))$("#chatHost").insertAdjacentHTML("beforebegin",'<button class="chatfab" id="chatFab" title="Chat">Chat<i class="cbadge"'+(S.chatUnread?'':' hidden')+'>'+(S.chatUnread||"")+'</i></button>');
-  var fab=$("#chatFab");if(fab)fab.onclick=openChat;
-  if(S.page==="chat"&&!isPhone())ensureChatFrame();
-  chatLayout();
-}
+function afterRender(){}
 
 /* ================= Text messages (Settings > Customer messages) ================= */
 var SMS_EV=[["created","Booking created","Hẹn mới · gửi khi lưu hẹn mới"],["reminder","Booking reminder","Nhắc hẹn · gửi trước giờ hẹn"],["updated","Booking updated","Đổi hẹn · gửi khi đổi ngày / giờ"],["cancelled","Booking cancelled","Hủy hẹn · gửi khi xóa hẹn"]];
@@ -165,7 +122,7 @@ S.pSet=null;S.todayBk=null;
 function myTabObj(){return sById(myTab())}
 function buildPhoneShell(){
   $("#root").innerHTML='<div class="ptop"><div class="brand">'+BRAND_SVG+'First Source<span>'+S.season+'</span></div><span class="pwho" id="welcome"></span><button class="burger" id="burger" aria-label="Menu">☰</button></div>'+
-    '<div class="page phone" id="page"></div><div class="pbar" id="pbar"></div><div id="pmenu"></div><div id="modalHost"></div><div id="chatHost"></div><span id="nav" hidden></span><span id="sheets" hidden></span>';
+    '<div class="page phone" id="page"></div><div class="pbar" id="pbar"></div><div id="pmenu"></div><div id="modalHost"></div><span id="nav" hidden></span><span id="sheets" hidden></span>';
   $("#burger").onclick=function(){togglePMenu()};
 }
 function togglePMenu(force){var m=$("#pmenu");var open=force!==undefined?force:!m.innerHTML;
@@ -173,18 +130,18 @@ function togglePMenu(force){var m=$("#pmenu");var open=force!==undefined?force:!
   if(!open){m.innerHTML="";return}
   var it=[["attn","Attention",""]];
   if(isAdmin()){S.staff.forEach(function(t){if(t.id!==myTab())it.push([t.id,shortOf(t),"t"])});it.push(["reports","Reports","a"],["acct","Accounting","a"],["records","Records","a"],["settings","Settings","a"])}
-  it.push(["psearch","Search",""],["__pw","Đổi mật khẩu",""]);if($("#chatFrame"))it.push(["__cout","Sign out Chat",""]);it.push(["__out","Sign out","dg"]);
+  it.push(["psearch","Search",""],["__pw","Đổi mật khẩu",""]);it.push(["__out","Sign out","dg"]);
   m.innerHTML='<div class="psheet"><div class="psheet-in">'+it.map(function(x){return '<button class="mi '+x[2]+(S.page===x[0]?' on':'')+'" data-pm="'+x[0]+'">'+esc(x[1])+'</button>'}).join("")+'</div></div>';
   m.firstChild.onclick=function(e){var b=e.target.closest("[data-pm]");if(!b){togglePMenu(false);return}var k=b.getAttribute("data-pm");togglePMenu(false);
-    if(k==="__pw"){showChangePw(false);return}if(k==="__cout"){chatOnlySignOut();toast("Đã sign out Chat");return}if(k==="__out"){logout();return}
-    closeChat();if(k==="settings")S.pSet=null;S.page=k;render();window.scrollTo(0,0)};
+    if(k==="__pw"){showChangePw(false);return}if(k==="__out"){logout();return}
+    if(k==="settings")S.pSet=null;S.page=k;render();window.scrollTo(0,0)};
 }
 function renderPhoneNav(){
   var mt=myTabObj(),items=[["home","Home"],["fees","Fees"],["appt","Appt"]];
-  if(mt)items.push([mt.id,shortOf(mt)]);items.push(["__chat","Chat"]);
-  var cur=S.chatOpen?"__chat":S.page;
-  $("#pbar").innerHTML=items.map(function(x){return '<button data-pb="'+x[0]+'" class="'+(cur===x[0]?'on':'')+'"><span>'+esc(x[1])+'</span>'+(x[0]==="__chat"?'<i class="cbadge"'+(S.chatUnread?'':' hidden')+'>'+(S.chatUnread||"")+'</i>':'')+'</button>'}).join("");
-  $$("[data-pb]").forEach(function(b){b.onclick=function(){var k=b.getAttribute("data-pb");togglePMenu(false);if(k==="__chat"){if(S.chatOpen)closeChat();else openChat();return}closeChat();S.page=k;render();window.scrollTo(0,0)}});
+  if(mt)items.push([mt.id,shortOf(mt)]);
+  var cur=S.page;
+  $("#pbar").innerHTML=items.map(function(x){return '<button data-pb="'+x[0]+'" class="'+(cur===x[0]?'on':'')+'"><span>'+esc(x[1])+'</span></button>'}).join("");
+  $$("[data-pb]").forEach(function(b){b.onclick=function(){var k=b.getAttribute("data-pb");togglePMenu(false);S.page=k;render();window.scrollTo(0,0)}});
   $("#welcome").textContent=me();
 }
 function phoneRender(p,pg){
@@ -314,5 +271,4 @@ function openRecForm(id,i,ro){
     saveRow(id,i,fields);close();render();toast("Đã lưu")};
 }
 
-/* ================= go ================= */
-start();
+/* start() is called at the end of v18.js */

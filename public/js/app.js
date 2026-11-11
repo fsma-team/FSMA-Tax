@@ -37,7 +37,7 @@ function api(method,path,body){
   if(body!==undefined){opt.headers["content-type"]="application/json";opt.body=JSON.stringify(body)}
   return fetch("/api"+path,opt).then(function(r){
     return r.json().catch(function(){return {}}).then(function(d){
-      if(r.status===401&&path!=="/login"&&path!=="/me"){chatSignOut();showLogin("Phiên đăng nhập đã hết, vui lòng đăng nhập lại.");throw new ApiErr(401,d.error)}
+      if(r.status===401&&path!=="/login"&&path!=="/me"){showLogin("Phiên đăng nhập đã hết, vui lòng đăng nhập lại.");throw new ApiErr(401,d.error)}
       if(!r.ok){var e=new ApiErr(r.status,d.error||"Có lỗi xảy ra");e.data=d;throw e}
       return d})
   },function(){throw new ApiErr(0,"Không có kết nối, thử lại sau")});
@@ -52,7 +52,7 @@ function canEditTab(id){return isAdmin()||myTab()===id}
 function canBook(){return true}
 function sById(id){return S.staff.filter(function(x){return x.id===id})[0]}
 function shortOf(s){return (s&&(s.short||s.name))||""}
-function mapTab(t){return {id:tk(t.id),dbId:t.id,name:t.name,short:t.short_name||"",sheetLen:t.sheet_len,theme:{color:t.color,font:t.font,title:t.title,tag:t.tagline}}}
+function mapTab(t){return {id:tk(t.id),dbId:t.id,name:t.name,short:t.short_name||"",sheetLen:t.sheet_len,theme:{color:t.color,font:t.font,title:t.title,tag:t.tagline},av:t.avatar||null}}
 
 /* ---------- client rows ---------- */
 function blank(i){return {id:null,pos:i,date:"",status:"",name:"",ssn:"",amt:0,method:"Cash",online:false,esign:false,paid:false,paidDate:"",note:"",tip:0,deleted:false}}
@@ -97,7 +97,7 @@ function showLogin(msg){
     '<form id="lf"><label>Username</label><input type="text" id="lu" autocomplete="username" autocapitalize="none" required><label>Password</label><input type="password" id="lp" autocomplete="current-password" required><div class="err" id="le"></div><button class="btn pri" type="submit" style="width:100%;justify-content:center;padding:8px">Đăng nhập</button></form></div></div>';
   $("#lu").focus();
   $("#lf").onsubmit=function(e){e.preventDefault();$("#le").textContent="";
-    api("POST","/login",{username:$("#lu").value,password:$("#lp").value}).then(function(){chatSignOut();start()}).catch(function(er){$("#le").textContent=er.message})};
+    api("POST","/login",{username:$("#lu").value,password:$("#lp").value}).then(function(){start()}).catch(function(er){$("#le").textContent=er.message})};
 }
 function showChangePw(forced){
   $("#root").innerHTML='<div class="login"><div class="login-box"><h2>Đổi mật khẩu</h2>'+(forced?'<div class="notice">Đây là lần đăng nhập đầu tiên (hoặc mật khẩu vừa được đặt lại). Vui lòng đặt mật khẩu mới, ít nhất 8 ký tự.</div>':'')+
@@ -126,13 +126,13 @@ function loadBoot(){
   }).catch(function(e){if(e&&e.data&&e.data.must_change)showChangePw(true);else if(e.status!==401){$("#root").innerHTML='<div class="login"><div class="login-box"><h2>Không tải được dữ liệu</h2><div class="err">'+esc(e.message)+'</div><button class="btn" id="retry">Thử lại</button></div></div>';$("#retry").onclick=function(){location.reload()}}});
 }
 function mapUser(u){return {id:u.id,u:u.username,full:u.full_name,n:u.display_name,role:u.role==="admin"?"Admin":"Preparer",tab:u.tab_id?tk(u.tab_id):"",tmp:u.must_change,locked:u.locked,active:u.active}}
-function logout(){chatSignOut();api("POST","/logout").catch(function(){}).then(function(){showLogin()})}
+function logout(){api("POST","/logout").catch(function(){}).then(function(){showLogin()})}
 function buildShell(){
   if(isPhone()){buildPhoneShell();return}
   $("#root").innerHTML='<div class="topbar"><div class="inner"><div class="brand">'+BRAND_SVG+'First Source<span>Tax season '+S.season+'</span></div>'+
     '<div class="gsearch"><input type="text" id="gq" placeholder="Tìm 4 số cuối SSN hoặc tên khách" autocomplete="off"><button class="btn pri" id="gbtn">Search</button></div>'+
     '<div class="userbox"><div class="welcome" id="welcome"></div><div><a href="#" id="pwLink">Đổi mật khẩu</a> · <a href="#" id="outLink" class="logout">Đăng xuất</a></div></div></div></div>'+
-    '<div class="menubar"><div class="nav" id="nav"></div></div><div class="sheets"><div class="in" id="sheets"></div></div><div class="page" id="page"></div><div id="modalHost"></div><div id="chatHost"></div>';
+    '<div class="menubar"><div class="nav" id="nav"></div></div><div class="sheets"><div class="in" id="sheets"></div></div><div class="page" id="page"></div><div id="modalHost"></div>';
   $("#pwLink").onclick=function(e){e.preventDefault();showChangePw(false)};
   $("#outLink").onclick=function(e){e.preventDefault();logout()};
   $("#gbtn").onclick=runSearch;
@@ -166,10 +166,9 @@ function renderNav(){
   var items=[["home","Homepage"],["fees","Fees"],["appt","Appointment"],["attn","Attention"]];
   if(isAdmin()){items.push(["reports","Reports"]);items.push(["acct","Accounting"]);items.push(["records","Records"]);items.push(["settings","Settings"])}
   if(isPhone()){renderPhoneNav();return}
-  items.push(["__chat","Chat"]);
-  $("#nav").innerHTML=items.map(function(x){return '<button data-p="'+x[0]+'" class="'+(S.page===x[0]||(x[0]==="__chat"&&S.page==="chat")?'on':'')+'">'+x[1]+(x[0]==="__chat"?'<i class="cbadge" id="chatBadge"'+(S.chatUnread?'':' hidden')+'>'+(S.chatUnread||"")+'</i>':'')+'</button>'}).join("");
+  $("#nav").innerHTML=items.map(function(x){return '<button data-p="'+x[0]+'" class="'+(S.page===x[0]?'on':'')+'">'+x[1]+'</button>'}).join("");
   $("#sheets").innerHTML=S.staff.map(function(s){return '<button class="st'+(S.page===s.id?' on':'')+'" data-p="'+s.id+'" style="--c:'+(PALETTE[s.theme.color])+'">'+esc(s.name)+'</button>'}).join("")+(isAdmin()?'<button class="st add" data-p="__add" title="Chỉ Admin">+ Thêm tab</button>':'');
-  $$("[data-p]").forEach(function(b){b.onclick=function(){var k=b.getAttribute("data-p");if(k==="__add"){addStaff();return}if(k==="__chat")k="chat";S.page=k;render()}});
+  $$("[data-p]").forEach(function(b){b.onclick=function(){var k=b.getAttribute("data-p");if(k==="__add"){addStaff();return}S.page=k;render()}});
   $("#welcome").textContent="Welcome, "+me();
 }
 function addStaff(){
@@ -627,7 +626,7 @@ function bindAppt(){
     }});
 }
 function openBooking(k,p){
-  var ex=!!S.bookings[k],b=S.bookings[k]||{n:"",p:"",f:"",s:"",note:"",span:1},m=$("#modalHost"),off=p[0]==="Office";
+  var ex=!!S.bookings[k],b=S.bookings[k]||{n:"",p:"",f:1,s:"",note:"",span:1},m=$("#modalHost"),off=p[0]==="Office";
   m.innerHTML='<div class="modal"><div class="box"><h3>'+p[0]+' · '+mdy(p[1])+' · '+p[2]+'</h3><div class="f">'+
     '<label>Client name <span class="req">*</span></label><input type="text" id="bn" value="'+esc(b.n)+'">'+
     '<label>Phone <span class="req">*</span></label><input type="text" id="bp" value="'+esc(b.p)+'" placeholder="714-000-0000">'+
@@ -830,12 +829,11 @@ function loadLog(){api("GET","/log").then(function(l){S.log=l;S.logLoaded=true;i
 function render(){
   if(!S.me)return;
   if(!isAdmin()&&(S.page==="settings"||S.page==="reports"||S.page==="records"||S.page==="acct"))S.page="home";
-  if(!sById(S.page)&&["home","fees","appt","attn","reports","acct","records","settings","search","psearch","chat"].indexOf(S.page)<0)S.page="home";
+  if(!sById(S.page)&&["home","fees","appt","attn","reports","acct","records","settings","search","psearch"].indexOf(S.page)<0)S.page="home";
   renderNav();
   var p=S.page,pg=$("#page"),h;
-  if(isPhone()&&p==="chat"){S.page=p="home";openChat()}
   if(isPhone()&&phoneRender(p,pg)){afterRender();return}
-  pg.className="page"+(isPhone()?" phone":"")+((p==="appt"||sById(p)||p==="attn"||p==="records"||p==="search"||p==="chat")?" wide":"");
+  pg.className="page"+(isPhone()?" phone":"")+((p==="appt"||sById(p)||p==="attn"||p==="records"||p==="search")?" wide":"");
   if(p==="appt"&&S.apptSub!=="Work Schedule")ensureWeeks();
   if(p==="records"&&!S.rec){
     pg.innerHTML='<div class="muted">Đang tải Records…</div>';
@@ -846,7 +844,7 @@ function render(){
     return;
   }
   if(p==="settings"&&S.setSub==="log"&&!S.logLoaded)loadLog();
-  if(p==="chat")h=chatPage();else if(p==="home")h=pageHome();else if(p==="fees")h=pageFees();else if(p==="appt")h=pageAppt();else if(p==="attn")h=pageAttn();else if(p==="reports")h=pageReports();else if(p==="acct")h=pageAcct();else if(p==="records")h=pageRecords();else if(p==="search")h=pageSearch();else if(p==="settings")h=pageSettings();else h=pageStaff(p);
+  if(p==="home")h=pageHome();else if(p==="fees")h=pageFees();else if(p==="appt")h=pageAppt();else if(p==="attn")h=pageAttn();else if(p==="reports")h=pageReports();else if(p==="acct")h=pageAcct();else if(p==="records")h=pageRecords();else if(p==="search")h=pageSearch();else if(p==="settings")h=pageSettings();else h=pageStaff(p);
   pg.innerHTML=h;
   afterRender();
   if(p==="appt")bindAppt();

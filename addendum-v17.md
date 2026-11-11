@@ -90,3 +90,18 @@ Chi phí ước tính: khoảng 4.000 tin / mùa (20 hẹn × ~63 ngày × 3 tin
   - Nút **Chat** tròn ở góc phải dưới mở cửa sổ nhỏ: 350px, chữ thu nhỏ 86% để thấy nhiều dòng hơn. Nút ⤢ trên cửa sổ nhỏ mở trang lớn.
   - Phone giữ như cũ (toàn màn hình).
 - File đổi: `public/index.html` (số ?v=171 để trình duyệt tải bản mới), `public/js/v17.js`, `public/js/app.js`, `public/css/app.css`.
+
+## v17.2 (11/07, sửa Chat)
+- Bỏ thu nhỏ chữ trong cửa sổ Chat (làm Chat bị cắt mất bên phải và mất ô gõ tin). Cửa sổ nhỏ: 360 × 560px, giao diện giống Chat trên phone của pb.
+- Pub Club (bản vá Chat, cần up lại): thêm `public/css/chat-tax.css`. Khi Chat nằm trong Tax thì ẩn header, menu và thanh xanh "Pub Club Chat" của Pub Club, Chat lấp đầy khung. Trang Chat lớn giống pb (3 cột).
+- Nút "Sign out" (chỉ sign out Chat) nằm trên thanh "Chat" của cửa sổ nhỏ; trên phone nằm trong ☰ (Sign out Chat).
+- index.html dùng ?v=172.
+
+## v17.3 (11/07, Chat giống hệt pb)
+- Mọi trang Tax: góc phải dưới là thanh Chat của pb (A− A+ ⚙ ▴), mở được tới 3 cửa sổ chat cạnh nhau, cỡ chữ và thanh công cụ giống pb. Khung Chat trong suốt: bấm ra ngoài các cửa sổ chat vẫn bấm được trang Tax bên dưới.
+- Menu Chat = trang Chat lớn như pb.fsma.team/#/chat.
+- Chưa log in Chat: góc phải dưới có nút "Chat" mở trang Chat để log in.
+- "Sign out Chat" nằm cạnh "Đổi mật khẩu" (desktop) / trong ☰ (phone).
+- Phone: bấm Chat ở thanh dưới = Chat toàn màn hình, vừa khít giữa 2 thanh.
+- Pub Club (cần up lại): `public/js/app.js` (thêm trang trống `#/dock` khi Chat nằm trong Tax), `public/js/chat-tax.js`, `public/css/chat-tax.css`, `public/chat-tax.html`.
+- index.html dùng ?v=173.

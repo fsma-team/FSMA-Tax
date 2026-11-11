@@ -1,6 +1,7 @@
 # First Source Tax (tax.fsma.team)
 
-v17: xem `addendum-v17.md` (Top producers, Chat Pub Club, text cho khách, phone, Lock day).
+v18: xem `addendum-v18.md` (bỏ Chat, giao diện đám mây, Appt phone theo ngày, hình đại diện tab, Admin không bị khóa).
+v17: xem `addendum-v17.md` (Top producers, text cho khách, phone, Lock day).
 
 Web theo dõi hồ sơ thuế của nhân viên (mỗi người 1 tab), có Appointment, Fees, Attention, Reports, Records (các mùa 2021–2025) và tìm khách theo 4 số cuối SSN.
 Netlify (web + server) + Supabase (database) + GitHub (code), giống pb.fsma.team và appt.fsma.team.
@@ -19,6 +20,7 @@ Netlify (web + server) + Supabase (database) + GitHub (code), giống pb.fsma.te
 | 4 | `04-records-daily.sql` | Số tổng theo ngày cho Records > Summary / Report |
 | 4b | `06-accounting.sql` | Tab Accounting (Cash cuối ngày, Lương) và giờ Office nhận hẹn tới 18:00 |
 | 4c | `07-v17.sql` | v17: Lock day, text cho khách, trang xem hẹn, tên ngắn tab (xem `addendum-v17.md`) |
+| 4d | `08-v18.sql` | v18: hình đại diện tab (không bắt buộc, server tự thêm) |
 | 5 | `05-fees-update.sql` | Chỉ chạy khi đã chạy `02-seed.sql` từ bản cũ: thay toàn bộ bảng Fees bằng giá mới (sẽ ghi đè giá bạn đã sửa) |
 
    Các file `03-...` khá lớn (300–380 KB). Nếu SQL Editor báo quá lớn hoặc bị đứng, chạy từ máy tính bằng Node (xem mục "Chạy file SQL lớn" bên dưới).
@@ -52,7 +54,7 @@ Rồi Deploys > Trigger deploy > Deploy project without cache > chờ **Publishe
 | Trang | Trang | Preparer | (chưa có tab) |
 | Peter | Peter | Preparer | Peter |
 
-Thêm/sửa user, reset mật khẩu (về 12345), mở khóa: Settings > Users. 5 lần nhập sai thì khóa 15 phút (tăng dần tới 24 giờ).
+Thêm/sửa user, reset mật khẩu (về 12345), mở khóa: Settings > Users. 5 lần nhập sai thì khóa 15 phút (tăng dần tới 24 giờ). Admin không bao giờ bị khóa.
 
 ## Quyền (server kiểm tra, không chỉ giấu nút)
 - **Admin**: tất cả. Settings, Reports, Records, Activity log, đổi tên/thêm/xóa tab, sửa mọi tab.

@@ -15,6 +15,113 @@ const CALS = ['Office', 'Daniel', 'Peter'];
 const TEMP_PW = '12345';
 const DUMMY_HASH = '$2a$10$c5w3A/iP.Nz2R0t0kPqxZ.ePVDX4qlS0yi0wvUulgrpcYeICZUreG';
 
+// ---------- v18: make sure the v17 / v18 columns and tables exist ----------
+// The "Server error" when saving a booking happens when sql/07-v17.sql was not run (bookings.token missing).
+// On the first request of each server instance we check, and add whatever is missing (safe to repeat).
+const SCHEMA_SQL = `-- 07-v17.sql : v17 (Top producers, Lock day, text cho khách, trang xem hẹn).
+-- Chạy 1 lần trong Supabase SQL Editor (chạy lại lần 2 cũng không sao).
+
+-- Tên ngắn của tab (hiện ở Top producers và thanh dưới trên phone). Trống = dùng tên tab.
+alter table staff_tabs add column if not exists short_name text not null default '';
+update staff_tabs set short_name = 'Ngọcs' where name = 'Ngọc' and short_name = '';
+
+-- Cash cuối ngày: Lock day. snap = số đã chốt lúc Lock (để phần sửa sau đó dời qua ngày sau).
+create table if not exists cash_locks (
+  day       date primary key,
+  locked_at timestamptz not null default now(),
+  locked_by text,
+  snap      jsonb not null default '{}'::jsonb
+);
+alter table cash_locks enable row level security;
+
+-- Hẹn: mã link cho khách + có gửi text hay không
+alter table bookings add column if not exists token text;
+alter table bookings add column if not exists sms boolean not null default true;
+create unique index if not exists bookings_token_uq on bookings(token) where token is not null;
+
+-- Trang khách xem hẹn (tax.fsma.team/b/<mã>): giữ lại cả khi hẹn đã hủy
+create table if not exists booking_links (
+  token      text primary key,
+  data       jsonb not null,
+  status     text not null default 'ok',          -- ok | updated | cancelled
+  appt_at    timestamptz,                          -- giờ hẹn (để nhắc + hết hạn)
+  updated_at timestamptz not null default now()
+);
+alter table booking_links enable row level security;
+
+-- Tin nhắn đã / sẽ gửi
+create table if not exists sms_log (
+  id          bigserial primary key,
+  token       text,
+  kind        text not null,                       -- created | updated | cancelled | reminder | test
+  ref         text not null default '',            -- reminder: "1440@2027-02-03 10:00" (không gửi trùng)
+  to_phone    text not null,
+  body        text not null,
+  send_at     timestamptz not null default now(),
+  status      text not null default 'queued',      -- queued | sent | failed | demo | skipped
+  tries       int  not null default 0,
+  error       text,
+  provider_id text,
+  created_by  text,
+  created_at  timestamptz not null default now(),
+  sent_at     timestamptz
+);
+create unique index if not exists sms_log_ref_uq on sms_log(token, kind, ref) where kind = 'reminder';
+create index if not exists sms_log_queue_idx on sms_log(status, send_at);
+create index if not exists sms_log_token_idx on sms_log(token);
+alter table sms_log enable row level security;
+
+-- Cài đặt tin nhắn mặc định (Admin sửa ở Settings > Customer messages). Mặc định TẮT.
+insert into settings (key, value) values ('sms', '{
+  "on": false,
+  "from": "02-01", "to": "04-15",
+  "quiet": ["08:00", "21:00"],
+  "business": "First Source",
+  "phone": "714-640-6654",
+  "email": "contact@fsma.team",
+  "address": "9741 Bolsa Avenue Suite 217, Westminster CA 92683",
+  "bring": "Photo ID, Social Security cards, W-2 / 1099 forms, last year''s tax return.",
+  "created":   {"on": true, "text": "Your booking at {{ business }} is scheduled for {{ date }} at {{ hour }}. Manage it at {{ link }}"},
+  "updated":   {"on": true, "text": "Your booking at {{ business }} was updated: {{ link }}"},
+  "cancelled": {"on": true, "text": "Your {{ business }} booking was cancelled. Hope to see you another day."},
+  "reminder":  {"on": true, "text": "Just a reminder that your {{ business }} booking is on {{ date }} at {{ hour }}. Manage it at {{ link }}", "before": [1440, 60]}
+}'::jsonb) on conflict (key) do nothing;
+
+-- Giờ hẹn được đặt / dời lần cuối (để không gửi "nhắc" ngay sau khi vừa đặt hẹn sát giờ)
+alter table bookings add column if not exists sched_at timestamptz not null default now();
+
+-- 08-v18.sql : v18 (hình đại diện cho tab nhân viên).
+-- Không bắt buộc chạy: server tự thêm các cột / bảng này lần đầu chạy (và tự thêm phần của 07-v17.sql nếu còn thiếu).
+-- Chạy tay trong Supabase SQL Editor cũng được (chạy lại lần 2 cũng không sao).
+
+alter table staff_tabs add column if not exists avatar_kind  text not null default '';   -- '' = chữ cái | emo | img
+alter table staff_tabs add column if not exists avatar_emoji text not null default '';
+alter table staff_tabs add column if not exists avatar_ver   int  not null default 0;
+
+create table if not exists tab_avatars (
+  tab_id     int primary key references staff_tabs(id) on delete cascade,
+  mime       text not null,
+  data       bytea not null,
+  updated_at timestamptz not null default now()
+);
+alter table tab_avatars enable row level security;
+`;
+let _schema = null;
+function ensureSchema() {
+  if (!_schema) _schema = (async () => {
+    const sql = db();
+    const cols = await sql`select table_name, column_name from information_schema.columns
+      where table_schema = current_schema() and table_name in ('bookings','staff_tabs')`;
+    const tabs = await sql`select table_name from information_schema.tables
+      where table_schema = current_schema() and table_name in ('cash_locks','booking_links','sms_log','tab_avatars')`;
+    const has = (t, c) => cols.some((r) => r.table_name === t && r.column_name === c);
+    const ok = ['token', 'sms', 'sched_at'].every((c) => has('bookings', c))
+      && ['short_name', 'avatar_kind', 'avatar_emoji', 'avatar_ver'].every((c) => has('staff_tabs', c)) && tabs.length === 4;
+    if (!ok) { console.log('schema: adding v17 / v18 columns'); await sql.unsafe(SCHEMA_SQL); }
+  })().catch((e) => { console.error('schema', e); _schema = null; });
+  return _schema;
+}
+
 // ---------- auth ----------
 async function login(req) {
   const body = await req.json().catch(() => ({}));
@@ -26,11 +133,18 @@ async function login(req) {
     await bcrypt.compare(password, DUMMY_HASH);
     throw new HttpError(401, 'Wrong username or password');
   }
-  if (u.lock_until && new Date(u.lock_until) > new Date()) {
+  const isAdm = u.role === 'admin';
+  if (!isAdm && u.lock_until && new Date(u.lock_until) > new Date()) {
     const t = new Date(u.lock_until).toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit' });
     throw new HttpError(423, `Too many wrong tries. Locked until ${t}. An admin can unlock it.`);
   }
   const ok = await bcrypt.compare(password, u.pw_hash);
+  if (!ok && isAdm) {
+    // v18: an admin is never locked out. Slow down each wrong try instead and keep a record.
+    await new Promise((r) => setTimeout(r, 1500));
+    await sql`insert into activity_log (user_name, tab_name, kind, text) values (${u.display_name}, '', 'login', 'Admin gõ sai mật khẩu')`.catch(() => {});
+    throw new HttpError(401, 'Wrong username or password');
+  }
   if (!ok) {
     // atomic: 5 wrong = lock 15 min, then 30, 60 ... up to 24h
     const [r] = await sql`update users set
@@ -262,7 +376,42 @@ async function listRows(url) {
 }
 
 // ---------- tabs ----------
-const tabOut = (t) => ({ id: t.id, name: t.name, short_name: t.short_name || '', color: t.color, font: t.font, title: t.title, tagline: t.tagline, sort: t.sort, sheet_len: t.sheet_len });
+const avOut = (t) => t.avatar_kind === 'emo' && t.avatar_emoji ? { t: 'emo', v: t.avatar_emoji }
+  : t.avatar_kind === 'img' ? { t: 'img', u: '/api/avatar/' + t.id + '?v=' + (t.avatar_ver || 0) } : null;
+const tabOut = (t) => ({ id: t.id, name: t.name, short_name: t.short_name || '', color: t.color, font: t.font, title: t.title, tagline: t.tagline, sort: t.sort, sheet_len: t.sheet_len, avatar: avOut(t) });
+
+// v18: tab picture. body = {t:'letter'} | {t:'emo', v:'😎'} | {t:'img', mime, data(base64)}. Anyone can edit a banner (same as before).
+const AV_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+async function setAvatar(user, id, body) {
+  const sql = db();
+  const [t] = await sql`select id from staff_tabs where id=${id} and deleted_at is null`;
+  if (!t) throw new HttpError(404, 'Tab not found');
+  const k = body.t;
+  let u;
+  if (k === 'emo') {
+    const v = String(body.v || '').trim().slice(0, 16);
+    if (!v) throw new HttpError(400, 'Chọn một mặt cười');
+    [u] = await sql`update staff_tabs set avatar_kind='emo', avatar_emoji=${v} where id=${id} returning *`;
+    await sql`delete from tab_avatars where tab_id=${id}`;
+  } else if (k === 'img') {
+    if (!AV_MIME.includes(body.mime)) throw new HttpError(400, 'Chỉ nhận JPG, PNG, WEBP hoặc GIF');
+    const buf = Buffer.from(String(body.data || ''), 'base64');
+    if (!buf.length) throw new HttpError(400, 'Không đọc được hình');
+    if (buf.length > 2 * 1024 * 1024) throw new HttpError(400, 'Hình lớn hơn 2MB');
+    await sql`insert into tab_avatars (tab_id, mime, data, updated_at) values (${id}, ${body.mime}, ${buf}, now())
+      on conflict (tab_id) do update set mime=excluded.mime, data=excluded.data, updated_at=now()`;
+    [u] = await sql`update staff_tabs set avatar_kind='img', avatar_ver=avatar_ver+1 where id=${id} returning *`;
+  } else {
+    [u] = await sql`update staff_tabs set avatar_kind='', avatar_emoji='' where id=${id} returning *`;
+    await sql`delete from tab_avatars where tab_id=${id}`;
+  }
+  return tabOut(u);
+}
+async function getAvatar(id) {
+  const [a] = await db()`select mime, data from tab_avatars where tab_id=${id}`;
+  if (!a) throw new HttpError(404, 'No picture');
+  return new Response(a.data, { status: 200, headers: { 'content-type': a.mime, 'cache-control': 'private, max-age=31536000, immutable', 'x-content-type-options': 'nosniff' } });
+}
 
 async function createTab(user, body) {
   requireAdmin(user);
@@ -308,7 +457,7 @@ async function extendTab(user, id) {
 }
 
 // ---------- users (Admin) ----------
-const userOut = (u) => ({ id: u.id, username: u.username, full_name: u.full_name, display_name: u.display_name, role: u.role, tab_id: u.tab_id, active: u.active, must_change: u.must_change, locked: !!(u.lock_until && new Date(u.lock_until) > new Date()) });
+const userOut = (u) => ({ id: u.id, username: u.username, full_name: u.full_name, display_name: u.display_name, role: u.role, tab_id: u.tab_id, active: u.active, must_change: u.must_change, locked: u.role !== 'admin' && !!(u.lock_until && new Date(u.lock_until) > new Date()) });
 async function listUsers() {
   return (await db()`select * from users order by id`).map(userOut);
 }
@@ -335,6 +484,7 @@ async function updateUser(user, id, body) {
   if (!u) throw new HttpError(404, 'User not found');
   const role = body.role === undefined ? u.role : (body.role === 'admin' ? 'admin' : 'preparer');
   const active = body.active === undefined ? u.active : bool(body.active);
+  if (id === user.id && (role !== 'admin' || !active)) throw new HttpError(400, 'Không tự bỏ quyền Admin hoặc tự khóa tài khoản của mình được.');
   if ((role !== 'admin' || !active) && u.role === 'admin') {
     const [{ n }] = await sql`select count(*)::int as n from users where role='admin' and active and id<>${id}`;
     if (n === 0) throw new HttpError(400, 'There must be at least one active Admin');
@@ -804,6 +954,8 @@ const routes = [
   ['PATCH', '/tabs/:id', (x) => updateTab(x.user, x.id, x.body)],
   ['DELETE', '/tabs/:id', (x) => deleteTab(x.user, x.id)],
   ['POST', '/tabs/:id/extend', (x) => extendTab(x.user, x.id)],
+  ['PUT', '/tabs/:id/avatar', (x) => setAvatar(x.user, x.id, x.body)],
+  ['GET', '/avatar/:id', (x) => getAvatar(x.id)],
   ['GET', '/users', async (x) => { requireAdmin(x.user); return listUsers(); }],
   ['POST', '/users', (x) => createUser(x.user, x.body)],
   ['PATCH', '/users/:id', (x) => updateUser(x.user, x.id, x.body)],
@@ -853,6 +1005,7 @@ export default async function handler(req) {
   const path = url.pathname.replace(/^\/api/, '').replace(/\/+$/, '') || '/';
   try {
     if (req.method !== 'GET' && req.headers.get('x-tax') !== '1') throw new HttpError(403, 'Bad request');
+    await ensureSchema();
     if (path === '/login' && req.method === 'POST') return await login(req);
     if (path === '/health' && req.method === 'GET') return await health();
     const pm = path.match(/^\/public\/b\/([^/]+)(\/ics)?$/);
