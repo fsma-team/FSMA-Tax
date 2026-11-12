@@ -495,13 +495,13 @@ function recDaily19(ys){
   h+='<div class="statbar" style="margin-bottom:16px">'+cols.map(function(y){var d=days[y]||1;return '<div class="c"><b>'+(M==="inc"?mny(tot[y].inc):tot[y].c)+'</b><span>'+(y===NOW&&asc.indexOf(NOW)<0?'Mùa này ':'')+y+' · '+days[y]+' ngày · TB '+(M==="inc"?mny(tot[y].inc/d):(tot[y].c/d).toFixed(1))+'/ngày'+(S.rdM==="both"?' · '+mny(tot[y].inc):'')+'</span></div>'}).join("")+'</div>';
   if(!K.length)return h+'<div class="muted">Không có ngày nào trong khoảng này.</div>';
   var mx=1;K.forEach(function(k){cols.forEach(function(y){var o=Y[y][k];if(o&&o[M]>mx)mx=o[M]})});
-  var cell=function(o,w){if(!o)return '<span class="muted">–</span><small>'+WD[w]+'</small>';
-    var big=M==="inc"?mny(o.inc):o.c,sm=S.rdM==="both"?WD[w]+' · '+mny(o.inc):S.rdM==="inc"?WD[w]+' · '+o.c+' khách':WD[w];
-    return '<span class="rdb" style="width:'+Math.round(o[M]/mx*100)+'%"></span><b>'+big+'</b><small>'+sm+'</small>'};
+  var cell=function(o,w){var wd='<i class="wd">'+WD[w]+'</i>';if(!o)return '<span class="rdl">'+wd+'<span class="muted">–</span></span>';
+    var main=M==="inc"?'<b>'+mny(o.inc)+'</b>':'<b>'+o.c+'</b>',ex=S.rdM==="both"?'<span class="ex">'+mny(o.inc)+'</span>':S.rdM==="inc"?'<span class="ex">'+o.c+' kh</span>':'';
+    return '<span class="rdb" style="width:'+Math.max(2,Math.round(o[M]/mx*100))+'%"></span><span class="rdl">'+wd+main+ex+'</span>'};
   h+='<div class="wrap"><table class="t2 rd19"><tr><th><a href="#" data-rds="date">Ngày'+arrow("date")+'</a></th>'+cols.map(function(y){return '<th class="n"><a href="#" data-rds="'+y+'">'+y+arrow(y)+'</a><small>'+(y===NOW&&asc.indexOf(NOW)<0?'mùa này · ':'')+'nộp '+(y+1)+'</small></th>'}).join("")+(cols.length>1?'<th class="n"><a href="#" data-rds="avg">Trung bình'+arrow("avg")+'</a>'+(S.rdM==="both"?'<small>khách · income</small>':'')+'</th>':'')+'</tr>'+
     K.map(function(k){return '<tr><td><b>'+mdTxt19(k)+'</b></td>'+cols.map(function(y){var w=new Date((y+1)+"-"+k+"T12:00:00Z").getUTCDay();return '<td class="n'+(w===0||w===6?' we':'')+'">'+cell(Y[y][k],w)+'</td>'}).join("")+
-      (cols.length>1?'<td class="n"><b>'+(M==="inc"?mny(avg(k,"inc")):avg(k,"c").toFixed(1))+'</b>'+(S.rdM==="both"?'<small>'+mny(avg(k,"inc"))+'</small>':'')+'</td>':'')+'</tr>'}).join("")+
-    '<tr class="tot"><td>Tổng</td>'+cols.map(function(y){return '<td class="n">'+(M==="inc"?mny(tot[y].inc):tot[y].c)+(S.rdM==="both"?'<small>'+mny(tot[y].inc)+'</small>':'')+'</td>'}).join("")+(cols.length>1?'<td></td>':'')+'</tr></table></div>';
+      (cols.length>1?'<td class="n av"><span class="rdl"><b>'+(M==="inc"?mny(avg(k,"inc")):avg(k,"c").toFixed(1))+'</b>'+(S.rdM==="both"?'<span class="ex">'+mny(avg(k,"inc"))+'</span>':'')+'</span></td>':'')+'</tr>'}).join("")+
+    '<tr class="tot"><td>Tổng</td>'+cols.map(function(y){return '<td class="n"><span class="rdl"><b>'+(M==="inc"?mny(tot[y].inc):tot[y].c)+'</b>'+(S.rdM==="both"?'<span class="ex">'+mny(tot[y].inc)+'</span>':'')+'</span></td>'}).join("")+(cols.length>1?'<td></td>':'')+'</tr></table></div>';
   h+='<div class="muted small" style="margin-top:6px">Income = tổng tiền các preparer trong ngày (Refund trừ ra, không tính Tips)'+(S.rdNoPeter?' · không tính Peter':'')+' · Mùa này lấy từ các tab nhân viên.</div>';
   return h;
 }

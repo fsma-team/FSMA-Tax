@@ -346,15 +346,23 @@ body:not([data-style=simple]) .page-head h1{color:var(--cloud-ink)}
 .recf19 .btn.on{background:var(--cloud-fill);border-color:var(--cloud-line);color:var(--cloud-ink);font-weight:600}
 .recf19on{flex-basis:100%;font-size:12.5px;color:var(--ink);background:var(--yellow);border:1px solid var(--yline);border-radius:8px;padding:3px 10px;margin-top:4px}
 .rd19 th a{color:inherit;text-decoration:none}.rd19 th a:hover{color:var(--link)}
-.rd19 td.n{position:relative;min-width:110px}
-.rd19 td.n small{display:block;color:var(--muted);font-size:11px;font-weight:400}
-.rd19 td.we small{color:var(--orange-ink)}
-.rd19 .rdb{position:absolute;left:0;top:3px;bottom:3px;background:var(--cloud-fill);border-radius:4px;z-index:0}
-.rd19 td.n>b,.rd19 td.n>small,.rd19 td.n>span:not(.rdb){position:relative;z-index:1}
 .rd19 tr.tot td{font-weight:700;border-top:1px solid var(--line)}
 .rd19 th small{display:block;font-weight:400;color:var(--muted);font-size:11px}
 .rdbar19{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:12px;font-size:13.5px}
 .rdbar19 .seg19{display:inline-flex;gap:4px}
 .rdbar19 .btn.on{background:var(--cloud-fill);border-color:var(--cloud-line);color:var(--cloud-ink);font-weight:600}
 .rdbar19 .chk{display:inline-flex;gap:5px;align-items:center;cursor:pointer}
-.rd19 tr.tot td small{display:block;font-weight:400;color:var(--muted);font-size:11px}
+
+/* Theo ngày: bảng gọn, mỗi ô 1 dòng: thứ · số · income, thanh nền theo số */
+.rd19{width:auto;max-width:100%;border-collapse:collapse}
+.rd19 th,.rd19 td{padding:3px 8px}
+.rd19 th:first-child,.rd19 td:first-child{width:56px;white-space:nowrap}
+.rd19 td.n{position:relative;width:190px;min-width:150px;white-space:nowrap}
+.rd19 .rdb{position:absolute;left:4px;top:4px;bottom:4px;max-width:calc(100% - 8px);background:var(--cloud-fill);border-radius:4px}
+.rd19 .rdl{position:relative;display:flex;align-items:baseline;gap:8px;justify-content:flex-end}
+.rd19 .rdl b{font-variant-numeric:tabular-nums;min-width:28px;text-align:right}
+.rd19 .rdl .ex{color:var(--muted);font-size:12.5px;font-variant-numeric:tabular-nums;min-width:58px;text-align:right}
+.rd19 .rdl .wd{font-style:normal;font-size:11px;color:var(--faint);margin-right:auto}
+.rd19 td.we .wd{color:var(--orange-ink);font-weight:600}
+.rd19 td.av{background:var(--soft);width:140px}
+.rd19 tr.tot td{font-weight:700;border-top:1px solid var(--line)}
