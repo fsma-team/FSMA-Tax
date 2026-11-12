@@ -254,17 +254,17 @@ function nowCounts(){var td=todayISO(),wk=mondayISO(td),we=addDays(wk,6),o={c:0,
   allRows().forEach(function(x){var r=x.r;if(!r.date)return;var cl=r.status!=="Refund"&&r.name;if(r.date===td){if(cl)o.c++;o.inc+=amt(r)}if(r.date>=wk&&r.date<=we&&cl)o.wc++});return o}
 var WDN=["Chủ nhật","Thứ 2","Thứ 3","Thứ 4","Thứ 5","Thứ 6","Thứ 7"];
 function dayLbl(d){if(!d)return "";return WDN[new Date(d+"T12:00:00Z").getUTCDay()]+", "+mdy(d)}
-function recRows(){
+function recList19(){
   var R=S.home&&S.home.records;if(!R)return null;var n=nowCounts(),td=todayISO(),wk=mondayISO(td);
   var L=[["👥","Khách nhiều nhất / ngày",R.dayClients,n.c,"Hôm nay",String,td],["📆","Khách nhiều nhất / tuần",R.weekClients,n.wc,"Tuần này",String,wk],["🗓️","Ngày có hẹn đông nhất",R.dayBookings,R.dayBookings.now,"Hôm nay",function(v){return v+" hẹn"},td],["💰","Ngày income cao nhất",R.dayIncome,n.inc,"Hôm nay",function(v){return money(Math.round(v))},td]];
   return L.map(function(x){var rec=x[2].rec,day=x[2].day,now=x[3];if(now>rec){rec=now;day=x[6]}
     var isNew=now>0&&now>=rec&&day===x[6],tie=now>0&&now>=rec&&!isNew;
     return {ic:x[0],t:x[1],rec:rec,day:day,now:now,nl:x[4],fmt:x[5],isNew:isNew,tie:tie,key:x[1]}})}
-function recHtml(){var L=recRows();if(!L)return '<div class="muted small">Đang tải…</div>';
+function recHtml(){var L=recList19();if(!L)return '<div class="muted small">Đang tải…</div>';
   return L.map(function(r){var p=r.rec>0?Math.min(1,r.now/r.rec):0;
     return '<div class="rrow19'+(r.isNew?' new':'')+'"><span class="ri">'+r.ic+'</span><div class="rt"><div class="rtt">'+r.t+(r.isNew?' <span class="badge19">🎉 Kỷ lục mới!</span>':r.tie?' <span class="badge19">🔥 Bằng kỷ lục!</span>':'')+'</div><div class="bar19"><i style="width:'+(p*100)+'%"></i></div>'+
       '<div class="sub19">'+r.nl+': <b>'+r.fmt(r.now)+'</b>'+(r.isNew||r.rec<=0?'':' · còn '+r.fmt(r.rec-r.now)+' nữa')+'</div></div><div class="rv"><b>'+(r.rec>0?r.fmt(r.rec):'—')+'</b><small>'+(r.isNew?(r.nl==="Tuần này"?"Tuần này":"Hôm nay"):dayLbl(r.day))+'</small></div></div>'}).join("")}
-function recCheckNew(){var L=recRows();if(!L)return;var hit=false;L.forEach(function(r){if(!r.isNew)return;var k="rec19|"+r.key+"|"+todayISO()+"|"+r.now;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1")}catch(e){}hit=true});if(hit)V19.confetti()}
+function recCheckNew(){var L=recList19();if(!L)return;var hit=false;L.forEach(function(r){if(!r.isNew)return;var k="rec19|"+r.key+"|"+todayISO()+"|"+r.now;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1")}catch(e){}hit=true});if(hit)V19.confetti()}
 /* ---- bảng dán giấy ---- */
 function wallHtml(){var N=(S.home&&S.home.notes)||[];
   return N.slice(0,5).map(function(n){var r=((n.id*37)%5-2)*0.6;return '<div class="sticky19" style="--r:'+r.toFixed(1)+'deg"><div class="sb">'+esc(n.body)+'</div><div class="by"><span>— '+esc(n.by)+'</span><span><button class="hv'+(n.hearted?' on':'')+'" data-heart="'+n.id+'">♥ '+n.hearts+'</button>'+(n.mine||isAdmin()?'<button class="nx" data-unpin="'+n.id+'" title="Gỡ">×</button>':'')+'</span></div></div>'}).join("")+
