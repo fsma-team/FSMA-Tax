@@ -5,9 +5,6 @@
   --green:#4cae4c;--green-ink:#2e7d32;--purple:#6a3fb5;--orange:#d9822b;--orange-ink:#b45f06;--red:#d9534f;--red-ink:#b52b27;--yellow:#fff8d6;--closed:#e9ebee;
   --acc:#3d85c6;--acc-ink:#fff;
 }
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --ink:#e6e8eb;--muted:#a0a8b0;--faint:#7c858e;--line:#3a4048;--line2:#2c3238;--panel:#1f2328;--page:#16191d;--head:#262b31;--yellow:#4a4217;--closed:#2b3037;--link:#6ea8ee;--green-ink:#7fd183;--red-ink:#f0817d;--orange-ink:#f0b060;
-}}
 :root[data-theme="dark"]{--ink:#e6e8eb;--muted:#a0a8b0;--faint:#7c858e;--line:#3a4048;--line2:#2c3238;--panel:#1f2328;--page:#16191d;--head:#262b31;--yellow:#4a4217;--closed:#2b3037;--link:#6ea8ee;--green-ink:#7fd183;--red-ink:#f0817d;--orange-ink:#f0b060}
 *{box-sizing:border-box}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}

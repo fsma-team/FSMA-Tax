@@ -71,7 +71,7 @@ export async function requireUser(req) {
         and last_seen > now() - ${IDLE_MIN + ' minutes'}::interval
       returning user_id
     )
-    select u.id, u.username, u.full_name, u.display_name, u.role, u.tab_id, u.active, u.must_change, u.appt_font
+    select u.id, u.username, u.full_name, u.display_name, u.role, u.tab_id, u.active, u.must_change, u.appt_font, u.theme, u.food, u.zodiac
     from s join users u on u.id = s.user_id`;
   const u = rows[0];
   if (!u || !u.active) throw new HttpError(401, 'Session expired - please log in again');

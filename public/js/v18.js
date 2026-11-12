@@ -266,5 +266,4 @@ bindPhoneAppt=function(){
   document.addEventListener("contextmenu",function(e){if(e.target.closest&&e.target.closest(".pbk"))e.preventDefault()});
 })();
 
-/* ================= go ================= */
-start();
+/* start() is called at the end of v19.js */

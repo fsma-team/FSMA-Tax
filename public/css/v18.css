@@ -3,7 +3,6 @@
   --cloud-fill:#eef6fd;--cloud-line:#6c9fcf;--cloud-ink:#2a6aa6;--cloud-deco:#d3e4f3;--dot:#cfdeec;--soft:#f6fafe;--bkfill:#eaf3fc;--bkshadow:rgba(60,110,160,.18);
   --yellow:#fffaf0;--yline:#f3e3b5;
 }
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--cloud-fill:#1d2b39;--cloud-line:#4f80b0;--cloud-ink:#8dbbec;--cloud-deco:#2a3a4a;--dot:#34404c;--soft:#1b2026;--bkfill:#22344a;--bkshadow:rgba(0,0,0,.45);--yellow:#3a3518;--yline:#57502a}}
 :root[data-theme="dark"]{--cloud-fill:#1d2b39;--cloud-line:#4f80b0;--cloud-ink:#8dbbec;--cloud-deco:#2a3a4a;--dot:#34404c;--soft:#1b2026;--bkfill:#22344a;--bkshadow:rgba(0,0,0,.45);--yellow:#3a3518;--yline:#57502a}
 
 /* ---------- clouds ---------- */

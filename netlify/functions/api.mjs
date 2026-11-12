@@ -11,6 +11,10 @@ const METHODS = ['Cash', 'Check', 'Zelle', 'Venmo'];
 const COLORS = ['Rose', 'Blue', 'Sunshine', 'Green', 'Orange', 'Purple', 'Teal', 'Pink'];
 const FONTS = ['Pacifico', 'Lobster', 'Comfortaa', 'Montserrat', 'Nunito', 'Oswald', 'Gloria Hallelujah', 'Quicksand'];
 const APPT_FONTS = ['Default', 'Nunito', 'Quicksand', 'Montserrat', 'Comfortaa'];
+const THEMES = ['simple', 'genz', 'pro', 'autumn', 'rain', 'amazon', 'hawaii', 'snack', 'chill', 'city'];
+const FOODS = ['boba', 'trabb', 'che', 'cavien', 'bovien', 'bttron', 'btcuon', 'bunbo', 'sbux', 'matcha', 'bacxiu'];
+const ZODIACS = ['aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo', 'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces'];
+const MOODS = ['😎', '☕', '🥱', '🤯', '🥳'];
 const CALS = ['Office', 'Daniel', 'Peter'];
 const TEMP_PW = '12345';
 const DUMMY_HASH = '$2a$10$c5w3A/iP.Nz2R0t0kPqxZ.ePVDX4qlS0yi0wvUulgrpcYeICZUreG';
@@ -106,18 +110,55 @@ create table if not exists tab_avatars (
 );
 alter table tab_avatars enable row level security;
 `;
+const SCHEMA_V19 = `-- 09-v19.sql : v19 (theme từng người, món ruột, cung hoàng đạo, hẹn Business, bảng dán giấy, Trưa nay ăn gì).
+-- Không bắt buộc chạy: server tự thêm lần đầu chạy. Chạy tay trong Supabase SQL Editor cũng được (chạy lại không sao).
+
+alter table users add column if not exists theme  text not null default 'simple';
+alter table users add column if not exists food   text not null default '';
+alter table users add column if not exists zodiac text not null default '';
+
+alter table bookings add column if not exists biz boolean not null default false;
+
+-- Bảng dán giấy trên Homepage (tự ẩn sau 3 ngày)
+create table if not exists home_notes (
+  id         bigserial primary key,
+  user_id    int references users(id) on delete set null,
+  user_name  text not null,
+  body       text not null,
+  hearts     int[] not null default '{}',
+  created_at timestamptz not null default now()
+);
+create index if not exists home_notes_created_idx on home_notes(created_at);
+alter table home_notes enable row level security;
+
+-- Trưa nay ăn gì + mood hôm nay (mỗi người 1 phiếu / ngày)
+create table if not exists home_votes (
+  day     date not null,
+  user_id int  not null references users(id) on delete cascade,
+  kind    text not null check (kind in ('lunch','mood')),
+  choice  text not null,
+  primary key (day, user_id, kind)
+);
+alter table home_votes enable row level security;
+
+insert into settings (key, value) values ('lunch', '["🍜 Phở","🥖 Bánh mì","🍚 Cơm tấm","🍕 Pizza"]'::jsonb) on conflict (key) do nothing;
+`;
 let _schema = null;
 function ensureSchema() {
   if (!_schema) _schema = (async () => {
     const sql = db();
     const cols = await sql`select table_name, column_name from information_schema.columns
-      where table_schema = current_schema() and table_name in ('bookings','staff_tabs')`;
+      where table_schema = current_schema() and table_name in ('bookings','staff_tabs','users')`;
     const tabs = await sql`select table_name from information_schema.tables
-      where table_schema = current_schema() and table_name in ('cash_locks','booking_links','sms_log','tab_avatars')`;
+      where table_schema = current_schema() and table_name in ('cash_locks','booking_links','sms_log','tab_avatars','home_notes','home_votes')`;
     const has = (t, c) => cols.some((r) => r.table_name === t && r.column_name === c);
     const ok = ['token', 'sms', 'sched_at'].every((c) => has('bookings', c))
-      && ['short_name', 'avatar_kind', 'avatar_emoji', 'avatar_ver'].every((c) => has('staff_tabs', c)) && tabs.length === 4;
+      && ['short_name', 'avatar_kind', 'avatar_emoji', 'avatar_ver'].every((c) => has('staff_tabs', c))
+      && ['cash_locks', 'booking_links', 'sms_log', 'tab_avatars'].every((t) => tabs.some((r) => r.table_name === t));
     if (!ok) { console.log('schema: adding v17 / v18 columns'); await sql.unsafe(SCHEMA_SQL); }
+    const ok19 = ['theme', 'food', 'zodiac'].every((c) => has('users', c)) && has('bookings', 'biz')
+      && ['home_notes', 'home_votes'].every((t) => tabs.some((r) => r.table_name === t));
+    if (!ok19) { console.log('schema: adding v19 columns'); await sql.unsafe(SCHEMA_V19); }
   })().catch((e) => { console.error('schema', e); _schema = null; });
   return _schema;
 }
@@ -170,7 +211,7 @@ async function health() {
   return json(out);
 }
 
-const meOut = (u) => ({ id: u.id, username: u.username, full_name: u.full_name, display_name: u.display_name, role: u.role, tab_id: u.tab_id, must_change: u.must_change, appt_font: u.appt_font });
+const meOut = (u) => ({ id: u.id, username: u.username, full_name: u.full_name, display_name: u.display_name, role: u.role, tab_id: u.tab_id, must_change: u.must_change, appt_font: u.appt_font, theme: u.theme || 'simple', food: u.food || '', zodiac: u.zodiac || '' });
 
 async function changePassword(user, body) {
   const sql = db();
@@ -220,6 +261,10 @@ function checkSetting(key, v) {
     return o;
   }
   if (key === 'sms') return checkSms(v);
+  if (key === 'lunch') {
+    if (!Array.isArray(v) || v.length > 8) throw new HttpError(400, 'Bad list');
+    return v.map((x) => String(x).trim().slice(0, 40)).filter(Boolean);
+  }
   if (key === 'self_keep') {
     if (!Array.isArray(v) || v.length > 20) throw new HttpError(400, 'Bad list');
     return v.map((x) => String(x).trim().slice(0, 40)).filter(Boolean);
@@ -526,7 +571,7 @@ async function delBlackout(user, id) {
 }
 
 // ---------- bookings ----------
-const bookOut = (b) => ({ id: Number(b.id), cal: b.cal, date: b.day, slot: b.slot, span: b.span, n: b.client, p: b.phone, f: b.files, s: b.preparer, note: b.note, sms: b.sms !== false, tk: b.token || '' });
+const bookOut = (b) => ({ id: Number(b.id), cal: b.cal, date: b.day, slot: b.slot, span: b.span, n: b.client, p: b.phone, f: b.files, s: b.preparer, note: b.note, sms: b.sms !== false, tk: b.token || '', biz: !!b.biz });
 
 // v17: customer link + text message after a booking is saved / moved / cancelled
 async function linkUpsert(sql, b, status) {
@@ -568,6 +613,7 @@ async function saveBooking(user, body) {
   const span = Math.max(1, Number(body.span) || 1);
   const prep = cal === 'Office' ? (s(body.preparer, 40) || '') : '';
   const note = s(body.note, 200) || '';
+  const biz = bool(body.biz);
   const old = body.old && body.old.cal ? { cal: body.old.cal, day: isoDate(body.old.day), slot: String(body.old.slot) } : null;
   let prev = null;
   const saved = await sql.begin(async (t) => {
@@ -603,10 +649,10 @@ async function saveBooking(user, body) {
     const token = prev?.token || newBookToken();
     const sms = body.sms === undefined ? (prev ? prev.sms : true) : bool(body.sms);
     const schedAt = moved ? new Date() : prev.sched_at;
-    const [b] = await t`insert into bookings (cal,day,slot,span,client,phone,files,preparer,note,created_by,token,sms,sched_at)
-      values (${cal},${day},${slot},${span},${client},${phone},${files},${prep},${note},${user.display_name},${token},${sms},${schedAt})
+    const [b] = await t`insert into bookings (cal,day,slot,span,client,phone,files,preparer,note,created_by,token,sms,sched_at,biz)
+      values (${cal},${day},${slot},${span},${client},${phone},${files},${prep},${note},${user.display_name},${token},${sms},${schedAt},${biz})
       on conflict (cal,day,slot) do update set span=excluded.span, client=excluded.client, phone=excluded.phone, files=excluded.files,
-        preparer=excluded.preparer, note=excluded.note, updated_at=now(), token=excluded.token, sms=excluded.sms, sched_at=excluded.sched_at
+        preparer=excluded.preparer, note=excluded.note, updated_at=now(), token=excluded.token, sms=excluded.sms, sched_at=excluded.sched_at, biz=excluded.biz
       returning *`;
     return { b, moved };
   });
@@ -912,9 +958,125 @@ async function backup() {
 
 // ---------- prefs ----------
 async function putPrefs(user, body) {
-  if (!APPT_FONTS.includes(body.appt_font)) throw new HttpError(400, 'Bad font');
-  await db()`update users set appt_font=${body.appt_font} where id=${user.id}`;
+  const sql = db();
+  if (body.appt_font !== undefined) {
+    if (!APPT_FONTS.includes(body.appt_font)) throw new HttpError(400, 'Bad font');
+    await sql`update users set appt_font=${body.appt_font} where id=${user.id}`;
+  }
+  if (body.theme !== undefined) {
+    if (!THEMES.includes(body.theme)) throw new HttpError(400, 'Bad theme');
+    await sql`update users set theme=${body.theme} where id=${user.id}`;
+  }
+  if (body.food !== undefined) {
+    if (body.food !== '' && !FOODS.includes(body.food)) throw new HttpError(400, 'Bad food');
+    await sql`update users set food=${body.food} where id=${user.id}`;
+  }
+  if (body.zodiac !== undefined) {
+    if (body.zodiac !== '' && !ZODIACS.includes(body.zodiac)) throw new HttpError(400, 'Bad zodiac');
+    await sql`update users set zodiac=${body.zodiac} where id=${user.id}`;
+  }
   return { ok: true };
+}
+
+// ---------- v19: Homepage (bảng dán giấy, Trưa nay ăn gì, mood, kỷ lục) ----------
+const NOTE_DAYS = 3;
+async function homeData(user, withRecords) {
+  const sql = db();
+  const day = todayLA();
+  const notes = await sql`select id, user_id, user_name, body, hearts, created_at from home_notes
+    where created_at > now() - ${NOTE_DAYS + ' days'}::interval order by created_at desc limit 30`;
+  const votes = await sql`select kind, choice, user_id from home_votes where day=${day}`;
+  const [st] = await sql`select value from settings where key='lunch'`;
+  const lunch = { options: Array.isArray(st?.value) ? st.value : [], votes: {}, mine: '' };
+  let mood = '';
+  for (const v of votes) {
+    if (v.kind === 'lunch') { lunch.votes[v.choice] = (lunch.votes[v.choice] || 0) + 1; if (v.user_id === user.id) lunch.mine = v.choice; }
+    if (v.kind === 'mood' && v.user_id === user.id) mood = v.choice;
+  }
+  const out = {
+    notes: notes.map((n) => ({ id: Number(n.id), by: n.user_name, mine: n.user_id === user.id, body: n.body, hearts: n.hearts.length, hearted: n.hearts.includes(user.id), at: n.created_at })),
+    lunch, mood,
+  };
+  if (withRecords) out.records = await homeRecords(sql, day);
+  return out;
+}
+// Kỷ lục: các mùa cũ (records_daily) + mùa này (rows) + lịch hẹn (bookings)
+async function homeRecords(sql, day) {
+  const [r] = await sql`
+    with d as (
+      select day, sum(clients)::int as c, sum(income)::numeric as inc from records_daily group by day
+      union all
+      select work_date as day,
+        count(*) filter (where name <> '' and status <> 'Refund')::int as c,
+        sum(case when status = 'Refund' then -abs(amount) else amount end)::numeric as inc
+      from rows where deleted_at is null and work_date is not null
+        and work_date > coalesce((select max(day) from records_daily), '1900-01-01'::date) group by work_date
+    ), dd as (select day, sum(c)::int as c, sum(inc)::numeric as inc from d group by day),
+    w as (select date_trunc('week', day)::date as wk, sum(c)::int as c from dd group by 1),
+    b as (select day, count(*)::int as n from bookings group by day)
+    select
+      (select json_build_object('v', c, 'day', day) from dd order by c desc, day limit 1) as day_c,
+      (select json_build_object('v', inc, 'day', day) from dd order by inc desc, day limit 1) as day_inc,
+      (select json_build_object('v', c, 'day', wk) from w order by c desc, wk limit 1) as week_c,
+      (select json_build_object('v', n, 'day', day) from b order by n desc, day limit 1) as day_bk,
+      (select coalesce(c, 0) from dd where day = ${day}) as now_c,
+      (select coalesce(inc, 0) from dd where day = ${day}) as now_inc,
+      (select coalesce(c, 0) from w where wk = date_trunc('week', ${day}::date)::date) as now_wc,
+      (select coalesce(n, 0) from b where day = ${day}) as now_bk`;
+  return {
+    dayClients: { rec: r.day_c?.v || 0, day: r.day_c?.day || '', now: r.now_c || 0 },
+    weekClients: { rec: r.week_c?.v || 0, day: r.week_c?.day || '', now: r.now_wc || 0 },
+    dayBookings: { rec: r.day_bk?.v || 0, day: r.day_bk?.day || '', now: r.now_bk || 0 },
+    dayIncome: { rec: Number(r.day_inc?.v || 0), day: r.day_inc?.day || '', now: Number(r.now_inc || 0) },
+  };
+}
+async function addNote(user, body) {
+  const t = String(body.body ?? '').trim().replace(/\s+/g, ' ').slice(0, 140);
+  if (!t) throw new HttpError(400, 'Viết gì đó trước đã');
+  const sql = db();
+  const [{ n }] = await sql`select count(*)::int as n from home_notes where user_id=${user.id} and created_at > now() - interval '1 day'`;
+  if (n >= 20) throw new HttpError(400, 'Hôm nay dán nhiều quá rồi');
+  await sql`insert into home_notes (user_id, user_name, body) values (${user.id}, ${user.display_name}, ${t})`;
+  // dọn dữ liệu cũ để database luôn nhỏ
+  await sql`delete from home_notes where created_at < now() - interval '30 days'`;
+  await sql`delete from home_votes where day < current_date - 60`;
+  return homeData(user, false);
+}
+async function delNote(user, id) {
+  const sql = db();
+  const [n] = await sql`select user_id from home_notes where id=${id}`;
+  if (!n) return homeData(user, false);
+  if (n.user_id !== user.id && user.role !== 'admin') throw new HttpError(403, 'Chỉ người dán (hoặc Admin) được gỡ');
+  await sql`delete from home_notes where id=${id}`;
+  return homeData(user, false);
+}
+async function heartNote(user, id) {
+  await db()`update home_notes set hearts = case when ${user.id} = any(hearts) then array_remove(hearts, ${user.id}) else array_append(hearts, ${user.id}) end where id=${id}`;
+  return homeData(user, false);
+}
+async function vote(user, body) {
+  const kind = body.kind === 'mood' ? 'mood' : 'lunch';
+  const choice = String(body.choice ?? '').slice(0, 40);
+  const sql = db();
+  const day = todayLA();
+  if (kind === 'lunch' && choice) {
+    const [st] = await sql`select value from settings where key='lunch'`;
+    if (!(Array.isArray(st?.value) && st.value.includes(choice))) throw new HttpError(400, 'Bad choice');
+  }
+  if (kind === 'mood' && choice && !MOODS.includes(choice)) throw new HttpError(400, 'Bad mood');
+  if (!choice) await sql`delete from home_votes where day=${day} and user_id=${user.id} and kind=${kind}`;
+  else await sql`insert into home_votes (day, user_id, kind, choice) values (${day}, ${user.id}, ${kind}, ${choice})
+    on conflict (day, user_id, kind) do update set choice=excluded.choice`;
+  return homeData(user, false);
+}
+// Số điện thoại đã có hẹn từ hôm nay trở đi (cả 3 lịch)
+async function phoneBookings(url) {
+  const digits = String(url.searchParams.get('p') || '').replace(/\D/g, '').slice(-10);
+  if (digits.length < 10) return [];
+  const not = String(url.searchParams.get('not') || '');
+  const rows = await db()`select cal, day, slot, client, preparer from bookings
+    where day >= ${todayLA()} and right(regexp_replace(phone, '[^0-9]', '', 'g'), 10) = ${digits} order by day, slot limit 10`;
+  return rows.filter((b) => `${b.cal}|${b.day}|${b.slot}` !== not).map((b) => ({ cal: b.cal, date: b.day, slot: b.slot, n: b.client, s: b.preparer }));
 }
 
 // ---------- boot ----------
@@ -928,7 +1090,9 @@ async function boot(user) {
   const fees = await getFees(sql);
   const rowsRes = await listRows(new URL('http://x/rows'));
   const users = user.role === 'admin' ? await listUsers() : [];
+  const home = await homeData(user, true).catch((e) => { console.error('home', e); return null; });
   return {
+    home,
     me: meOut(user),
     tabs: tabs.map(tabOut),
     settings,
@@ -945,7 +1109,7 @@ const routes = [
   ['GET', '/me', (x) => ({ user: meOut(x.user) })],
   ['POST', '/password', (x) => changePassword(x.user, x.body)],
   ['GET', '/boot', (x) => boot(x.user)],
-  ['GET', '/rows', (x) => listRows(x.url)],
+  ['GET', '/rows', async (x) => { const out = await listRows(x.url); if (x.url.searchParams.get('home') === '1') out.home = await homeData(x.user, false).catch(() => null); return out; }],
   ['POST', '/rows', (x) => createRow(x.user, x.body)],
   ['PATCH', '/rows/:id', (x) => updateRow(x.user, x.id, x.body)],
   ['DELETE', '/rows/:id', (x) => deleteRow(x.user, x.id)],
@@ -980,6 +1144,12 @@ const routes = [
   ['PUT', '/sched', (x) => putSched(x.user, x.body)],
   ['PUT', '/fees', (x) => putFees(x.user, x.body)],
   ['PUT', '/prefs', (x) => putPrefs(x.user, x.body)],
+  ['GET', '/home', (x) => homeData(x.user, x.url.searchParams.get('rec') === '1')],
+  ['POST', '/home/notes', (x) => addNote(x.user, x.body)],
+  ['DELETE', '/home/notes/:id', (x) => delNote(x.user, x.id)],
+  ['POST', '/home/notes/:id/heart', (x) => heartNote(x.user, x.id)],
+  ['PUT', '/home/vote', (x) => vote(x.user, x.body)],
+  ['GET', '/bookings/phone', (x) => phoneBookings(x.url)],
   ['GET', '/search', (x) => search(x.url)],
   ['GET', '/records/daily', async (x) => { requireAdmin(x.user); return recordsDaily(); }],
   ['GET', '/records/clients', async (x) => { requireAdmin(x.user); return recordsClients(x.url); }],
