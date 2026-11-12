@@ -460,5 +460,88 @@ afterRender=function(){
   $$(".pbk[data-bk]").forEach(function(el){var b=S.bookings[el.getAttribute("data-bk")];if(!b)return;if(b.biz)el.classList.add("biz");if(b.note){var t=el.querySelector("b");if(t){t.classList.add("hn");t.innerHTML=t.innerHTML.replace(/ \*$/,"")}}});
 };
 
+/* ================= Records: lọc theo ngày (trong mỗi năm) + tab "Theo ngày" (sort) ================= */
+S.recFrom="";S.recTo="";S.rdSort="date";S.rdDir=1;S.rdP="";S.rcSort="desc";
+function md19(s){var m=/^\s*(\d{1,2})\s*[\/\-.]\s*(\d{1,2})\s*$/.exec(s||"")||/^\s*(\d{2})(\d{2})\s*$/.exec(s||"");if(!m)return "";var a=+m[1],b=+m[2],L=[31,29,31,30,31,30,31,31,30,31,30,31];if(a<1||a>12||b<1||b>L[a-1])return "";if(a===2&&b===29)b=28;return ("0"+a).slice(-2)+"-"+("0"+b).slice(-2)}
+function mdShift19(k,n){var d=new Date(Date.UTC(2001,+k.slice(0,2)-1,+k.slice(3))+n*864e5);return ("0"+(d.getUTCMonth()+1)).slice(-2)+"-"+("0"+d.getUTCDate()).slice(-2)}
+function mdTxt19(k){return k?(+k.slice(0,2))+"/"+(+k.slice(3)):""}
+var _recRows18=recRows;
+recRows=function(y){var o=_recRows18(y);if(!S.recFrom&&!S.recTo)return o;var a=(y+1)+"-"+(S.recFrom||"01-01"),b=(y+1)+"-"+(S.recTo||"12-31");
+  if(S.recFrom&&S.recTo&&S.recFrom>S.recTo)return o.filter(function(r){return r.d>=a||r.d<=b});return o.filter(function(r){return r.d>=a&&r.d<=b})};
+function recFilterBar19(){var on=S.recFrom||S.recTo,Q=[["01-20","01-31","Cuối tháng 1"],["02-01","02-10","1/2 – 10/2"],["02-01","02-28","Tháng 2"],["03-01","03-31","Tháng 3"],["04-01","04-15","1/4 – 15/4"]];
+  return '<div class="recf19"><span class="lbl">Ngày nộp</span> từ <input type="text" id="rfFrom" placeholder="mm/dd" value="'+mdTxt19(S.recFrom)+'"> đến <input type="text" id="rfTo" placeholder="mm/dd" value="'+mdTxt19(S.recTo)+'"> <button class="btn sm pri" id="rfGo">Lọc</button>'+
+    '<span class="sep"></span>hoặc quanh ngày <input type="text" id="rfAround" placeholder="2/3"> ± <select id="rfPad">'+[0,1,2,3,5,7].map(function(n){return '<option'+(n===3?' selected':'')+'>'+n+'</option>'}).join("")+'</select> ngày <button class="btn sm" id="rfAroundGo">Xem</button>'+
+    '<span class="sep"></span>'+Q.map(function(q){return '<button class="btn sm'+(S.recFrom===q[0]&&S.recTo===q[1]?' on':'')+'" data-rq="'+q[0]+'|'+q[1]+'">'+q[2]+'</button>'}).join(" ")+
+    (on?' <button class="btn sm" id="rfClear">Bỏ lọc</button><div class="recf19on">Đang lọc: <b>'+(mdTxt19(S.recFrom)||"đầu mùa")+' – '+(mdTxt19(S.recTo)||"cuối mùa")+'</b> của mỗi năm nộp (VD năm 2025 = ngày trong 2026). Áp dụng cho Summary, Report, Preparers, Theo ngày, Clients.</div>':'')+'</div>'}
+S.rdM="both";S.rdNoPeter=true;S.rdNow=true;
+function recDaily19(ys){
+  var asc=ys.slice().sort(),names={},Y={},keys={},WD=["CN","T2","T3","T4","T5","T6","T7"],cols=asc.slice(),NOW=S.season,noP=function(p){return S.rdNoPeter&&/^peter/i.test(p||"")};
+  var add=function(y,d,p,c,v){names[p]=1;if(noP(p)||(S.rdP&&p!==S.rdP))return;if(+d.slice(0,4)!==y+1)return;var k=d.slice(5);
+    if(S.recFrom||S.recTo){var a=S.recFrom||"01-01",b=S.recTo||"12-31";if(a<=b?(k<a||k>b):(k<a&&k>b))return}
+    var o=Y[y][k]=Y[y][k]||{c:0,inc:0};o.c+=c;o.inc+=v;keys[k]=1};
+  asc.forEach(function(y){Y[y]={};recRows(y).forEach(function(r){add(y,r.d,r.p,r.a[0],inc(r.a))})});
+  if(S.rdNow&&asc.indexOf(NOW)<0){Y[NOW]={};allRows().forEach(function(x){var r=x.r;if(!r.date)return;add(NOW,r.date,x.s.name,(r.status!=="Refund"&&r.name)?1:0,amt(r))});if(Object.keys(Y[NOW]).length)cols.push(NOW);else delete Y[NOW]}
+  var M=S.rdM==="inc"?"inc":"c",K=Object.keys(keys);
+  var avg=function(k,f){var s=0,n=0;cols.forEach(function(y){var o=Y[y][k];if(o){s+=o[f];n++}});return n?s/n:0};
+  var val=function(k){return S.rdSort==="date"?k:S.rdSort==="avg"?avg(k,M):((Y[S.rdSort]||{})[k]||{c:-1,inc:-1})[M]};
+  K.sort(function(a,b){var x=val(a),z=val(b);return (x<z?-1:x>z?1:0)*S.rdDir});
+  var arrow=function(k){return S.rdSort===String(k)?(S.rdDir>0?' ▲':' ▼'):''},mny=function(n){return money(Math.round(n))};
+  var h='<div class="rdbar19"><span class="seg19">'+[["both","Khách + Income"],["c","Khách"],["inc","Income"]].map(function(x){return '<button class="btn sm'+(S.rdM===x[0]?' on':'')+'" data-rdm="'+x[0]+'">'+x[1]+'</button>'}).join("")+'</span>'+
+    '<label class="chk"><input type="checkbox" id="rdNoP"'+(S.rdNoPeter?' checked':'')+'> Không tính Peter</label>'+
+    '<label class="chk"><input type="checkbox" id="rdNow"'+(S.rdNow?' checked':'')+'> Thêm mùa này ('+NOW+')</label>'+
+    '<span class="muted">Preparer</span> <select id="rdP"><option value="">Tất cả</option>'+Object.keys(names).sort().filter(function(n){return !noP(n)}).map(function(n){return '<option'+(n===S.rdP?' selected':'')+'>'+esc(n)+'</option>'}).join("")+'</select>'+
+    '<span class="muted small">Bấm tiêu đề cột để sắp xếp</span></div>';
+  var tot={},days={};cols.forEach(function(y){tot[y]={c:0,inc:0};days[y]=0;Object.keys(Y[y]).forEach(function(k){tot[y].c+=Y[y][k].c;tot[y].inc+=Y[y][k].inc;days[y]++})});
+  h+='<div class="statbar" style="margin-bottom:16px">'+cols.map(function(y){var d=days[y]||1;return '<div class="c"><b>'+(M==="inc"?mny(tot[y].inc):tot[y].c)+'</b><span>'+(y===NOW&&asc.indexOf(NOW)<0?'Mùa này ':'')+y+' · '+days[y]+' ngày · TB '+(M==="inc"?mny(tot[y].inc/d):(tot[y].c/d).toFixed(1))+'/ngày'+(S.rdM==="both"?' · '+mny(tot[y].inc):'')+'</span></div>'}).join("")+'</div>';
+  if(!K.length)return h+'<div class="muted">Không có ngày nào trong khoảng này.</div>';
+  var mx=1;K.forEach(function(k){cols.forEach(function(y){var o=Y[y][k];if(o&&o[M]>mx)mx=o[M]})});
+  var cell=function(o,w){if(!o)return '<span class="muted">–</span><small>'+WD[w]+'</small>';
+    var big=M==="inc"?mny(o.inc):o.c,sm=S.rdM==="both"?WD[w]+' · '+mny(o.inc):S.rdM==="inc"?WD[w]+' · '+o.c+' khách':WD[w];
+    return '<span class="rdb" style="width:'+Math.round(o[M]/mx*100)+'%"></span><b>'+big+'</b><small>'+sm+'</small>'};
+  h+='<div class="wrap"><table class="t2 rd19"><tr><th><a href="#" data-rds="date">Ngày'+arrow("date")+'</a></th>'+cols.map(function(y){return '<th class="n"><a href="#" data-rds="'+y+'">'+y+arrow(y)+'</a><small>'+(y===NOW&&asc.indexOf(NOW)<0?'mùa này · ':'')+'nộp '+(y+1)+'</small></th>'}).join("")+(cols.length>1?'<th class="n"><a href="#" data-rds="avg">Trung bình'+arrow("avg")+'</a>'+(S.rdM==="both"?'<small>khách · income</small>':'')+'</th>':'')+'</tr>'+
+    K.map(function(k){return '<tr><td><b>'+mdTxt19(k)+'</b></td>'+cols.map(function(y){var w=new Date((y+1)+"-"+k+"T12:00:00Z").getUTCDay();return '<td class="n'+(w===0||w===6?' we':'')+'">'+cell(Y[y][k],w)+'</td>'}).join("")+
+      (cols.length>1?'<td class="n"><b>'+(M==="inc"?mny(avg(k,"inc")):avg(k,"c").toFixed(1))+'</b>'+(S.rdM==="both"?'<small>'+mny(avg(k,"inc"))+'</small>':'')+'</td>':'')+'</tr>'}).join("")+
+    '<tr class="tot"><td>Tổng</td>'+cols.map(function(y){return '<td class="n">'+(M==="inc"?mny(tot[y].inc):tot[y].c)+(S.rdM==="both"?'<small>'+mny(tot[y].inc)+'</small>':'')+'</td>'}).join("")+(cols.length>1?'<td></td>':'')+'</tr></table></div>';
+  h+='<div class="muted small" style="margin-top:6px">Income = tổng tiền các preparer trong ngày (Refund trừ ra, không tính Tips)'+(S.rdNoPeter?' · không tính Peter':'')+' · Mùa này lấy từ các tab nhân viên.</div>';
+  return h;
+}
+pageRecords=function(){
+  var ys=S.recYears.slice().sort(function(a,b){return b-a}),h='';
+  h+='<div class="page-head"><div><h1>Records</h1><div class="sub">Các mùa thuế cũ · chỉ Admin thấy</div></div></div>';
+  h+='<div class="rec-bar"><div><span class="lbl">Năm</span>'+REC_YEARS.map(function(y){return '<button class="btn'+(ys.length===1&&ys[0]===y?' on':'')+'" data-ry="'+y+'">'+y+'</button> '}).join("")+'<button class="btn'+(ys.length>1?' on':'')+'" id="ryAll">Chọn hết</button></div></div>';
+  h+=recFilterBar19();
+  h+='<div class="sub-tabs">'+[["summary","Summary"],["report","Report"],["prep","Preparers"],["daily","Theo ngày (khách · income)"],["clients","Clients"]].map(function(x){return '<button class="btn'+(S.recSub===x[0]?' on':'')+'" data-rs="'+x[0]+'">'+x[1]+'</button>'}).join("")+'<span class="muted small" style="margin-left:10px">'+(ys.length>1?'Tất cả '+ys.slice().sort().join(", "):ys[0]+' · nộp trong '+(ys[0]+1))+'</span></div>';
+  h+=S.recSub==="summary"?recSummary(ys):S.recSub==="report"?recReport(ys):S.recSub==="prep"?recPrep(ys):S.recSub==="daily"?recDaily19(ys):recClients(ys);
+  h+='<div class="muted small" style="margin-top:6px">Năm 2025 = khai thuế năm 2025, nộp trong 2026 (tương tự các năm khác) · Records chỉ có số tổng theo ngày và preparer · Năm nào tab không ghi Status thì EF, Accepted, Others hiện –.</div>';
+  return h;
+};
+loadRecClients=function(ys){
+  var key=ys.join(",")+"|"+S.rcP+"|"+S.rcQ+"|"+S.rcN+"|"+S.recFrom+"|"+S.recTo+"|"+S.rcSort;S.rcKey=key;S.rcLoading=true;
+  api("GET","/records/clients?years="+ys.join(",")+"&prep="+encodeURIComponent(S.rcP)+"&q="+encodeURIComponent(S.rcQ)+"&limit="+S.rcN+"&from="+S.recFrom+"&to="+S.recTo+"&sort="+S.rcSort).then(function(d){
+    if(S.rcKey!==key)return;S.rcRows=d.rows;S.rcTotal=d.total;S.rcLoading=false;
+    var host=$("#rcTable");if(host){host.innerHTML=recClientsTable();var c=$("#rcCount");if(c)c.textContent=d.total+" hồ sơ · đang hiện "+d.rows.length;bindRcMore(ys);rcSortHead19()}
+  }).catch(function(e){S.rcLoading=false;fail(e)});
+};
+function rcSortHead19(){var th=$("#rcTable th:nth-child(2)");if(!th)return;th.innerHTML='<a href="#" id="rcSort">Date '+(S.rcSort==="asc"?"▲":"▼")+'</a>';
+  $("#rcSort").onclick=function(e){e.preventDefault();S.rcSort=S.rcSort==="asc"?"desc":"asc";S.rcN=100;loadRecClients(S.recYears.slice().sort(function(a,b){return b-a}))}}
+var _bindRecords18=bindRecords;
+bindRecords=function(){
+  var ys=S.recYears.slice().sort(function(a,b){return b-a});
+  if($("#rcQ")){var key=ys.join(",")+"|"+S.rcP+"|"+S.rcQ+"|"+S.rcN+"|"+S.recFrom+"|"+S.recTo+"|"+S.rcSort;if(key!==S.rcKey)S.rcKey=null}
+  _bindRecords18();rcSortHead19();
+  function set(f,t){S.recFrom=f||"";S.recTo=t||"";S.rcN=100;render()}
+  var go=function(){var f=$("#rfFrom").value.trim(),t=$("#rfTo").value.trim(),a=f?md19(f):"",b=t?md19(t):"";if((f&&!a)||(t&&!b)){toast("Ngày ghi dạng tháng/ngày, VD 2/3",true);return}set(a,b)};
+  $("#rfGo").onclick=go;$("#rfFrom").onkeydown=$("#rfTo").onkeydown=function(e){if(e.key==="Enter")go()};
+  var ar=function(){var k=md19($("#rfAround").value);if(!k){toast("Ghi ngày dạng tháng/ngày, VD 2/3",true);return}var n=+$("#rfPad").value;set(mdShift19(k,-n),mdShift19(k,n))};
+  $("#rfAroundGo").onclick=ar;$("#rfAround").onkeydown=function(e){if(e.key==="Enter")ar()};
+  $$("[data-rq]").forEach(function(b){b.onclick=function(){var q=b.getAttribute("data-rq").split("|");set(q[0],q[1])}});
+  if($("#rfClear"))$("#rfClear").onclick=function(){set("","")};
+  if($("#rdP"))$("#rdP").onchange=function(){S.rdP=this.value;render()};
+  $$("[data-rdm]").forEach(function(b){b.onclick=function(){S.rdM=b.getAttribute("data-rdm");render()}});
+  if($("#rdNoP"))$("#rdNoP").onchange=function(){S.rdNoPeter=this.checked;render()};
+  if($("#rdNow"))$("#rdNow").onchange=function(){S.rdNow=this.checked;render()};
+  $$("[data-rds]").forEach(function(a){a.onclick=function(e){e.preventDefault();var k=a.getAttribute("data-rds");if(S.rdSort===k)S.rdDir=-S.rdDir;else{S.rdSort=k;S.rdDir=k==="date"?1:-1}render()}});
+};
+
 /* ================= go ================= */
 start();

@@ -815,6 +815,8 @@ async function recordsDaily() {
   const rows = await db()`select year, preparer, day, clients, income, tips, ef, accepted, others from records_daily order by year, preparer, day`;
   return { rows: rows.map((r) => [r.year, r.preparer, r.day, r.clients, Number(r.income), Number(r.tips), r.ef, r.accepted, r.others]) };
 }
+// 'MM-DD' -> [m, d] (v19 Records date filter)
+function md(v) { const m = /^(\d{2})-(\d{2})$/.exec(String(v || '')); if (!m) return null; const a = +m[1], b = +m[2]; return a >= 1 && a <= 12 && b >= 1 && b <= (a === 2 ? 28 : [4, 6, 9, 11].includes(a) ? 30 : 31) ? [a, b] : null; }
 async function recordsClients(url) {
   const sql = db();
   const years = (url.searchParams.get('years') || '').split(',').map(Number).filter((y) => Number.isInteger(y));
@@ -825,9 +827,14 @@ async function recordsClients(url) {
   const like = '%' + q.replace(/[%_\\]/g, '\\$&') + '%';
   const where = sql`${years.length ? sql`year = any(${sql.array(years)}::int[])` : sql`true`}
       ${prep ? sql`and preparer = ${prep}` : sql``}
-      ${q ? (/^\d{1,4}$/.test(q) ? (q.length === 4 ? sql`and ssn = ${q}` : sql`and ssn like ${q + '%'}`) : sql`and name_key like ${like}`) : sql``}`;
+      ${q ? (/^\d{1,4}$/.test(q) ? (q.length === 4 ? sql`and ssn = ${q}` : sql`and ssn like ${q + '%'}`) : sql`and name_key like ${like}`) : sql``}
+      ${md(url.searchParams.get('from')) ? sql`and day >= make_date(year + 1, ${md(url.searchParams.get('from'))[0]}, ${md(url.searchParams.get('from'))[1]})` : sql``}
+      ${md(url.searchParams.get('to')) ? sql`and day <= make_date(year + 1, ${md(url.searchParams.get('to'))[0]}, ${md(url.searchParams.get('to'))[1]})` : sql``}`;
+  const asc = url.searchParams.get('sort') === 'asc';
   const [{ n }] = await sql`select count(*)::int as n from records_clients where ${where}`;
-  const rows = await sql`select year, day, preparer, name, ssn, amount, status, note from records_clients where ${where} order by year desc, day desc, id limit ${limit} offset ${offset}`;
+  const rows = asc
+    ? await sql`select year, day, preparer, name, ssn, amount, status, note from records_clients where ${where} order by year desc, day asc, id limit ${limit} offset ${offset}`
+    : await sql`select year, day, preparer, name, ssn, amount, status, note from records_clients where ${where} order by year desc, day desc, id limit ${limit} offset ${offset}`;
   return { total: n, rows: rows.map((r) => ({ year: r.year, date: r.day, preparer: r.preparer, name: r.name, ssn: r.ssn, amt: Number(r.amount), status: r.status, note: r.note })) };
 }
 
