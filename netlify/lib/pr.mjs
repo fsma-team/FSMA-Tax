@@ -200,18 +200,23 @@ export async function putFee(user, body) {
   await audit(sql, user, 'fee', 'fee_line', id, { [m]: m === 'x' ? l.extra : (l.m || {})[m] ?? null }, { [m]: v });
   return { ok: true };
 }
+// v21.1: paid highlight. Before: max 200 cells per save (rest silently dropped) + 2 queries per line (slow → timeout on big selections).
+// Now: up to 3000 cells, 1 read + 1 update for the whole selection, returns how many cells were saved.
 export async function putFeeHl(user, body) {
   const sql = db(); const color = body.color ? t(body.color, 10) : '';
   if (color && !/^#[0-9a-f]{6}$/i.test(color)) throw new HttpError(400, 'Bad color');
-  const cells = Array.isArray(body.cells) ? body.cells.slice(0, 200) : [];
-  const ids = [...new Set(cells.map((c) => Number(c[0])).filter(Number.isInteger))];
-  for (const id of ids) {
-    const [l] = await sql`select hl from pr_fee_lines where id=${id}`; if (!l) continue;
-    const hl = { ...(l.hl || {}) };
-    cells.filter((c) => Number(c[0]) === id).forEach((c) => { const m = String(c[1]); if (color) hl[m] = color; else delete hl[m]; });
-    await sql`update pr_fee_lines set hl=${sql.json(hl)} where id=${id}`;
-  }
-  return { ok: true };
+  const cells = Array.isArray(body.cells) ? body.cells : [];
+  if (cells.length > 3000) throw new HttpError(400, 'Chọn ít hơn 3000 ô mỗi lần');
+  const by = new Map();
+  for (const c of cells) { const id = Number(c && c[0]); const m = String(c && c[1]);
+    if (!Number.isInteger(id) || !(m === 'x' || /^([1-9]|1[0-2])$/.test(m))) continue; if (!by.has(id)) by.set(id, new Set()); by.get(id).add(m); }
+  if (!by.size) return { ok: true, n: 0 };
+  const rows = await sql`select id, hl from pr_fee_lines where id = any(${sql.array([...by.keys()])}::int[])`;
+  const ids = [], hls = []; let n = 0;
+  for (const r of rows) { const hl = { ...(r.hl || {}) }; by.get(r.id).forEach((m) => { if (color) hl[m] = color; else delete hl[m]; n++; }); ids.push(r.id); hls.push(JSON.stringify(hl)); }
+  if (ids.length) await sql`update pr_fee_lines l set hl = v.hl::jsonb from (select unnest(${sql.array(ids)}::int[]) as id, unnest(${sql.array(hls)}::text[]) as hl) v where l.id = v.id`;
+  await audit(sql, user, color ? 'paid' : 'unpaid', 'fee_hl', null, null, { lines: ids.length, cells: n, color }).catch(() => {});
+  return { ok: true, n };
 }
 export async function addFeeLine(user, body) {
   const sql = db(); const bid = Number(body.bid), year = Number(body.year); const svc = SVCS.includes(body.svc) ? body.svc : 'Bookkeeping';

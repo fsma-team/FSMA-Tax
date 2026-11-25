@@ -464,11 +464,16 @@ function paintSel() {
     <span class="sb-act"><button class="btn green sm" data-hl="#c8e6c9">✓ Mark paid</button>${HL.filter(([c]) => c !== '#c8e6c9').map(([c, nm]) => `<button class="sw2" data-hl="${c}" title="Paid · ${nm}" style="background:${c}"></button>`).join('')}<button class="btn sm" data-hl="">Chưa paid</button><button class="link faint" data-selx>Esc</button></span>`;
 }
 function applyHl21(color) {
-  if (!selCells.length) { toast('Kéo chọn ô trước'); return; } const cells = [];
-  selCells.forEach((k) => { const c = cellLine(k); if (!c || !c.l.id || !c.v) return; c.l.hl ||= {}; if (color) c.l.hl[c.m] = color; else delete c.l.hl[c.m]; cells.push([c.l.id, c.m]); });
+  if (!selCells.length) { toast('Kéo chọn ô trước'); return; } const cells = [], undo = [];
+  selCells.forEach((k) => { const c = cellLine(k); if (!c || !c.l.id || !c.v) return; c.l.hl ||= {}; undo.push([c.l, c.m, c.l.hl[c.m]]); if (color) c.l.hl[c.m] = color; else delete c.l.hl[c.m]; cells.push([c.l.id, c.m]); });
   if (!cells.length) { toast('Các ô chọn chưa có số'); return; }
   render.keep = true; render(); paintSel();
-  api('PUT', '/pr/fee/hl', { cells, color }).then(() => toast(color ? `${cells.length} ô = paid` : `${cells.length} ô = expecting`)).catch(failT);
+  // v21.1: save in chunks, wait for the server; if it fails the colors go back so the screen never shows something that was not saved
+  const CH = 400; let saved = 0;
+  const back = (i, er) => { undo.slice(i).forEach(([l, m, v]) => { if (v) l.hl[m] = v; else delete l.hl[m]; }); render.keep = true; render(); paintSel(); toast((saved ? `Đã lưu ${saved} ô, ` : '') + 'phần còn lại chưa lưu được (' + ((er && er.message) || 'lỗi') + ') – các ô đó đã trả lại như cũ, thử lại', true); };
+  const next = (i) => { if (i >= cells.length) { toast(saved === cells.length ? `Đã lưu ${saved} ô = ${color ? 'paid' : 'expecting'}` : `Chỉ lưu được ${saved}/${cells.length} ô`, saved !== cells.length); return; }
+    api('PUT', '/pr/fee/hl', { cells: cells.slice(i, i + CH), color }).then((r) => { saved += (r && r.n) || 0; next(i + CH); }).catch((er) => back(i, er)); };
+  next(0);
 }
 document.addEventListener('mousedown', (e) => {
   const td = e.target.closest && e.target.closest('td.fc[data-cell]'); if (!td || !inPay(td) || td.querySelector('input') || e.button !== 0) return;
