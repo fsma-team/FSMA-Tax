@@ -168,6 +168,10 @@ function ensureSchema() {
     const t20 = await sql`select table_name from information_schema.tables where table_schema = current_schema() and table_name in ('pr_businesses','pr_audit','news_items','news_feeds')`;
     const ok20 = c20.some((r) => r.table_name === 'users') && c20.some((r) => r.table_name === 'pay_rows') && t20.length === 4;
     if (!ok20) { console.log('schema: adding v20 tables'); await sql.unsafe(SCHEMA_V20); }
+    // v21: report mode table (the one-time ticks are in sql/12-v21.sql)
+    await sql.unsafe(`create table if not exists pr_rep_mode (business_id int not null references pr_businesses(id) on delete cascade, year int not null,
+      q smallint not null check (q between 1 and 4), mode char(1) not null check (mode in ('M','Q')), primary key (business_id, year, q));
+      alter table pr_rep_mode enable row level security;`);
   })().catch((e) => { console.error('schema', e); _schema = null; });
   return _schema;
 }
@@ -1200,6 +1204,7 @@ const routes = [
   ['PATCH', '/pr/biz/:id', async (x) => { requireAdmin(x.user); return PR.updateBiz(x.user, x.id, x.body); }],
   ['DELETE', '/pr/biz/:id', async (x) => { requireAdmin(x.user); return PR.deleteBiz(x.user, x.id); }],
   ['PUT', '/pr/tick', async (x) => { requireAdmin(x.user); return PR.putTick(x.user, x.body); }],
+  ['PUT', '/pr/mode', async (x) => { requireAdmin(x.user); return PR.putMode(x.user, x.body); }], // v21
   ['PUT', '/pr/pnote', async (x) => { requireAdmin(x.user); return PR.putPNote(x.user, x.body); }],
   ['PUT', '/pr/fee', async (x) => { requireAdmin(x.user); return PR.putFee(x.user, x.body); }],
   ['PUT', '/pr/fee/hl', async (x) => { requireAdmin(x.user); return PR.putFeeHl(x.user, x.body); }],

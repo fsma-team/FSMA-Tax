@@ -698,8 +698,21 @@ function cashHist20() {
     ${G.slice().reverse().map((g) => `<tr><td class="nowrap"><b>${AC.cg === 'day' ? `<a href="#" data-cday="${g.k}">${lab(g)}</a>` : lab(g)}</b></td><td class="right num">${g.f.toLocaleString()}</td><td class="right num">${money(g.c)}</td><td class="right num">${money(g.k2)}</td><td class="right num">${money(g.z)}</td><td class="right num"><b>${money(g.g)}</b></td><td class="right num">${dif(g.g - g.c)}</td></tr>`).join('')}
     <tr class="tot"><td>Total</td><td class="right">${T.f.toLocaleString()}</td><td class="right">${money(T.c)}</td><td class="right">${money(T.k2)}</td><td class="right">${money(T.z)}</td><td class="right">${money(T.g)}</td><td class="right">${dif(T.g - T.c)}</td></tr></tbody></table></div></div></div>`;
 }
+// v21: Cash received + Note are plain text, double-click to edit (no input boxes, column widths never move)
+function editCash21(td) {
+  const tr = td.closest('[data-tab]'); const tab = +tr.dataset.tab; const f = td.dataset.c; const rec = cashRec(S.cashDay, tab) || { received: null, done: false, note: '' };
+  const cur = f === 'received' ? (rec.received == null ? '' : rec.received) : rec.note || '';
+  const i = cellEdit21(td, cur, { num: f === 'received', left: f === 'note' }); let done = false;
+  const fin = (save) => { if (done) return; done = true; if (!save || i.value.trim() === String(cur)) { keepY(render); return; }
+    const body = { day: S.cashDay, tab_id: tab, received: rec.received, done: rec.done, note: rec.note || '' };
+    if (f === 'received') { const v = i.value.replace(/[$,\s]/g, ''); body.received = v === '' ? null : +v; if (v !== '' && !Number.isFinite(body.received)) { toast('Số không đúng', true); keepY(render); return; } body.done = body.received != null; } else body.note = i.value.trim();
+    api('PUT', '/cash', body).then((r) => { const a = S.acct.cash; const k = a.indexOf(cashRec(S.cashDay, tab)); if (k >= 0) a[k] = r; else a.push(r); keepY(render); }).catch((er) => { keepY(render); fail(er); }); };
+  i.onkeydown = (k) => { if (k.key === 'Enter') fin(true); if (k.key === 'Escape') { k.stopPropagation(); fin(false); } }; i.onblur = () => fin(true);
+}
 function pageCash20() {
   let h = pageCash();
+  h = h.replace(/<td class="n"><input type="number" step="0\.01" class="cin" data-c="received" value="([^"]*)"( disabled)?><\/td>/g, (m, v, dis) => `<td class="n ${dis ? 'lk21' : 'cv21td ed20'}" data-c="received">${v !== '' ? money(+v) : `<span class="ph21">${dis ? '–' : 'double-click'}</span>`}</td>`)
+    .replace(/<td><input type="text" class="cnote" data-c="note" value="([^"]*)"( disabled)?><\/td>/g, (m, v, dis) => `<td class="${dis ? 'lk21' : 'cv21td ed20'} nt21" data-c="note">${v || ''}</td>`);
   const cut = h.indexOf('<h3 style="margin-top:22px">Các ngày khác</h3>'); if (cut >= 0) h = h.slice(0, cut);
   h = h.replace('<th class="n">Cash (theo hồ sơ)</th>', '<th class="n">Cash on records</th>').replace('<th class="n">Cash thực nhận</th>', '<th class="n">Cash received</th>').replace('<th class="n">Chênh lệch</th>', '<th class="n">Difference</th>')
     .replace('<th class="n">Hồ sơ</th>', '<th class="n">Files</th>').replace(/<div class="muted small" style="margin-top:6px">Gõ số vào Cash thực nhận[\s\S]*?<\/div>/, '')
@@ -771,13 +784,14 @@ function bindAcct20() {
     if (a && (a.dataset.act === 'pprev' || a.dataset.act === 'pnext')) { const ps = S.acct.periods.slice().sort((x, y) => (x.start < y.start ? -1 : 1)); const i = ps.findIndex((x) => x.id === S.payPer); const j = Math.min(Math.max(i + (a.dataset.act === 'pprev' ? -1 : 1), 0), ps.length - 1); if (ps[j]) S.payPer = ps[j].id; keepY(render); }
   };
   host.ondblclick = (e) => {
+    const cv = e.target.closest('td.cv21td'); if (cv && !cv.querySelector('input')) { editCash21(cv); return; } // v21: Cash received / Note = double-click
     const td = e.target.closest('[data-ed]'); if (!td || td.querySelector('input')) return;
     const [pid, sid, f] = td.dataset.ed.split('|'); const r = payRow(+pid, +sid) || {};
-    td.innerHTML = `<input class="edin20" value="${esc(r[f] == null ? '' : r[f])}">`; const i = td.firstChild; i.focus(); i.select(); let done = false;
+    const i = cellEdit21(td, r[f] == null ? '' : r[f], { left: f === 'note', num: f !== 'note' }); let done = false; // v21: editor floats over the cell
     const fin = (save) => { if (done) return; done = true; if (save && i.value !== String(r[f] == null ? '' : r[f])) savePayCell(+pid, +sid, f, i.value); else keepY(render); };
     i.onkeydown = (k) => { if (k.key === 'Enter') fin(true); if (k.key === 'Escape') { k.stopPropagation(); fin(false); } }; i.onblur = () => fin(true);
   };
-  if (S.acctSub20 === 'cash') { bindCash(); return; }
+  if (S.acctSub20 === 'cash') { if ($('#cashDay')) bindCash(); return; } // v21: page may still be loading
   if (!S.acct || !curPeriod()) { if ($('#newPer')) $('#newPer').onclick = newPer20; return; }
   $('#newPer').onclick = newPer20;
   const p = curPeriod();

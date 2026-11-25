@@ -21,6 +21,7 @@ export async function prData() {
   const B = await sql`select * from pr_businesses where deleted_at is null order by id`;
   const P = await sql`select * from pr_payroll`;
   const T = await sql`select business_id, year, slot, done from pr_ticks`;
+  const RM = await sql`select business_id, year, q, mode from pr_rep_mode`.catch(() => []); // v21: report Monthly / Quarterly per quarter
   const F = await sql`select * from pr_formations`;
   const L = await sql`select * from pr_fee_lines order by business_id, year, sort, id`;
   const N = await sql`select * from pr_notes order by created_at`;
@@ -42,6 +43,9 @@ export async function prData() {
   for (const k of T) { const o = by.get(k.business_id); if (!o) continue;
     const R = (o.rep[k.year] ||= { m: Array(12).fill(null), q: Array(4).fill(null) });
     const i = +k.slot.slice(1) - 1; (k.slot[0] === 'm' ? R.m : R.q)[i] = k.done ? 1 : 0;
+  }
+  for (const r of RM) { const o = by.get(r.business_id); if (!o) continue; // v21: modes {2026: ['M','M','Q','Q']}
+    const a = ((o.modes ||= {})[r.year] ||= [null, null, null, null]); a[r.q - 1] = r.mode;
   }
   for (const f of F) { const o = by.get(f.business_id); if (!o) continue;
     o.formation = { no: f.no, date: f.date || '', boi: f.boi, si: f.si, fee: n2(f.fee), f2553: f.f2553, permit: f.permit, dl: dec(f.dl_enc), boir: f.boir };
@@ -168,6 +172,15 @@ export async function putTick(user, body) {
   if (body.done === null) await sql`delete from pr_ticks where business_id=${bid} and year=${year} and slot=${slot}`;
   else await sql`insert into pr_ticks (business_id, year, slot, done, done_at, done_by) values (${bid}, ${year}, ${slot}, ${!!body.done}, now(), ${user.display_name})
     on conflict (business_id, year, slot) do update set done=excluded.done, done_at=now(), done_by=excluded.done_by`;
+  return { ok: true };
+}
+// v21: report Monthly (M) / Quarterly (Q) for one quarter (set in the business pop-up)
+export async function putMode(user, body) {
+  const sql = db(); const bid = Number(body.bid), year = Number(body.year), q = Number(body.q), mode = String(body.mode || '');
+  if (!Number.isInteger(bid) || !Number.isInteger(year) || !(q >= 1 && q <= 4) || !['M', 'Q'].includes(mode)) throw new HttpError(400, 'Bad mode');
+  await sql`insert into pr_rep_mode (business_id, year, q, mode) values (${bid}, ${year}, ${q}, ${mode})
+    on conflict (business_id, year, q) do update set mode = excluded.mode`;
+  await audit(sql, user, 'update', 'pr_rep_mode', bid, null, { year, q, mode });
   return { ok: true };
 }
 export async function putPNote(user, body) {

@@ -1,4 +1,4 @@
-// tax.fsma.team v20 - tab "Payroll & Service" (Admin only). Port of the Business v1 / mockup v20 client.
+// tax.fsma.team v20/v21 - tab "Payroll & Service" (Admin only). Port of the Business v1 / mockup v20 client.
 // Everything lives inside PAY20 so names (render, modal, toast, P, B, $ ...) do not clash with the Tax scripts.
 window.PAY20 = (function () {
 let TODAY = todayISO();
@@ -70,21 +70,26 @@ function autoWaive() {
 // news (GET /api/news?feed=payroll)
 let NEWS = null; let NEWSL = false;
 function loadNews() { if (NEWS || NEWSL) return; NEWSL = true; api('GET', '/news?feed=payroll').then((d) => { NEWS = d; NEWSL = false; if (S.page === 'pay' && CUR.r === 'home') { render.keep = true; render(); } }).catch(() => { NEWSL = false; NEWS = { items: [] }; }); }
-function quarterCells(b, y, q) {
-  const R = (b.rep[y] ||= { m: Array(12).fill(null), q: Array(4).fill(null) });
-  const m = R.m.slice((q - 1) * 3, q * 3); let Q = R.q[q - 1];
-  if (m.every((v) => v === null) && Q === null) { // no box in the sheet yet -> same rule as the latest known quarter
-    const last = lastRule(b); if (last === 'M') { for (let i = 0; i < 3; i++) R.m[(q - 1) * 3 + i] = 0; } else R.q[q - 1] = 0;
-    return quarterCells(b, y, q);
-  }
-  return { m: R.m.slice((q - 1) * 3, q * 3), q: R.q[q - 1], R };
-}
-function lastRule(b) {
-  const R = b.rep[CY] || { m: Array(12).fill(null), q: Array(4).fill(null) }; for (let q = 4; q >= 1; q--) { const m = R.m.slice((q - 1) * 3, q * 3); if (m.some((v) => v !== null)) return 'M'; if (R.q[q - 1] !== null) return 'Q'; }
+// v21: each quarter is reported Monthly (3 boxes) or Quarterly (1 box). Admin sets it in the business pop-up (b.modes[y] = ['M','Q',...]).
+// Before v21 the web guessed it from the boxes that existed in the sheet; a box that was never ticked was not saved -> boxes disappeared after reload.
+function modeOf(b, y, q) {
+  const M = b.modes && b.modes[y]; if (M && M[q - 1]) return M[q - 1];
+  const R = b.rep[y]; if (R) { const n = R.m.slice((q - 1) * 3, q * 3).filter((v) => v !== null).length; if (n >= 2) return 'M'; if (n === 1 || R.q[q - 1] !== null) return 'Q'; }
+  for (let k = q - 1; k >= 1; k--) { const x = M && M[k - 1]; if (x) return x; }
   return b.payroll && b.payroll.period === 'Quarterly' ? 'Q' : 'M';
 }
+function quarterCells(b, y, q) {
+  const R = (b.rep[y] ||= { m: Array(12).fill(null), q: Array(4).fill(null) });
+  const mode = modeOf(b, y, q); const ms = R.m.slice((q - 1) * 3, q * 3);
+  if (mode === 'M') return { mode, m: ms.map((v) => (v ? 1 : 0)), q: null, R };
+  return { mode, m: [null, null, null], q: R.q[q - 1] != null ? R.q[q - 1] : (ms.some((v) => v) ? 1 : 0), R };
+}
+// v21 Fees: a number in a cell = expecting; a highlighted cell = PAID. Note fees / annual / 1099 are always paid.
+const isPd = (l, k) => !!(l.virt || (l.hl && l.hl[k]));
+const lineSum = (l, paid = true) => Object.entries(l.m).reduce((a, [k, v]) => a + (v && isPd(l, k) === paid ? v : 0), 0) + (l.extra && isPd(l, 'x') === paid ? l.extra : 0);
+const qPaid = (l, q, paid = true) => [1, 2, 3].reduce((s, k) => { const m = (q - 1) * 3 + k; return s + (l.m[m] && isPd(l, String(m)) === paid ? l.m[m] : 0); }, 0);
 const noteFees = (b, y) => b.notes.filter((n) => n.amt && n.d.startsWith(y));
-const yrTotal = (b, y) => (b.fees[y] || []).reduce((s, l) => s + Object.values(l.m).reduce((a, v) => a + v, 0) + (l.extra || 0), 0) + (b.f1099[y] || []).reduce((s, o) => s + o.amt, 0) + noteFees(b, y).reduce((s, n) => s + n.amt, 0);
+const yrTotal = (b, y) => (b.fees[y] || []).reduce((s, l) => s + lineSum(l), 0) + (b.f1099[y] || []).reduce((s, o) => s + o.amt, 0) + noteFees(b, y).reduce((s, n) => s + n.amt, 0);
 const qSum = (l, q) => [1, 2, 3].reduce((s, k) => s + (l.m[(q - 1) * 3 + k] || 0), 0);
 const svcHtml = (b) => {
   const s = [];
@@ -115,20 +120,21 @@ const P = {};
 let CUR_M = +TODAY.slice(5, 7);
 const isDue = (y, m) => +y < CY || m <= CUR_M;
 const WAIVED = new Set(); // bid|year|label
-function owed() {
+// v21: short text "Payroll Oct–Nov 2026 · Bookkeeping Oct–Nov 2026"
+function dueTxt21(L) { const g = {}; L.forEach((i) => { const k = (i.svc === 'Payroll' ? '' : i.svc + ' ') + '|' + i.y; (g[k] ||= []).push(i); });
+  return Object.entries(g).map(([k, a]) => { const [sv, y] = k.split('|'); const ms = a.filter((i) => !/^Extra/.test(i.label)).map((i) => i.m).sort((x, z) => x - z); const ex = a.some((i) => /^Extra/.test(i.label));
+    const run = ms.length > 2 && ms[ms.length - 1] - ms[0] === ms.length - 1 ? MON[ms[0] - 1] + '–' + MON[ms[ms.length - 1] - 1] : ms.map((m) => MON[m - 1]).join(', ');
+    return sv + [run, ex ? 'Extra' : ''].filter(Boolean).join(', ') + ' ' + y; }).join(' · '); }
+function owed() { // v21: expecting (number, not highlighted) in a month of this year up to this month = not received yet
   const out = [];
   B.forEach((b) => {
     const items = [];
     Object.entries(b.fees).forEach(([y, L]) => L.forEach((l) => {
-      const ms = Object.keys(l.m).map(Number).filter((m) => l.m[m] != null); if (!ms.length) return;
-      let stop = l.flags.length ? Math.min(...l.flags.map((f) => +f.split(':')[0])) : 13;
-      const lastPaid = Math.max(...ms);
-      const left = +y < CY ? !(b.fees[+y + 1] || []).some((x) => x.svc === l.svc) : (l.svc === 'Payroll' && !(b.payroll && b.payroll.active));
-      if (left) stop = Math.min(stop, lastPaid + 1);
-      const nq = ms.filter((m) => m % 3 !== 0).length; const monthly = nq >= 2 && nq >= ms.length - nq; const first = Math.min(...ms);
+      if (+y !== CY) return; // v21: Due = this year only (old years are not marked paid yet)
+      const fl = new Set(l.flags.map((f) => +f.split(':')[0]));
       const push = (m, label, amt) => { const k = `${b.id}|${y}|${l.svc}|${label}`; items.push({ y, m, label, amt, svc: l.svc, k, waived: WAIVED.has(k) }); };
-      if (monthly) { let last = 0; for (let m = first; m < stop; m++) { if (l.m[m] != null) { last = l.m[m] || last; continue; } if (!isDue(y, m)) continue; push(m, MON[m - 1] + ' ' + y, last); } }
-      else { let last = 0; for (let q = Math.ceil(first / 3); q <= 4 && q * 3 < stop + 2; q++) { if ([1, 2, 3].some((k) => l.m[(q - 1) * 3 + k] != null)) { last = qSum(l, q) || last; continue; } if (!isDue(y, q * 3)) continue; push(q * 3, 'Q' + q + ' ' + y, last); } }
+      Object.entries(l.m).forEach(([k, v]) => { const m = +k; if (!v || isPd(l, k) || fl.has(m) || !isDue(y, m)) return; push(m, MON[m - 1] + ' ' + y, v); });
+      if (l.extra && !isPd(l, 'x') && +y <= CY) push(12, 'Extra ' + y, l.extra);
     }));
     if (items.length) out.push({ b, items, total: items.filter((i) => !i.waived).reduce((s, i) => s + i.amt, 0), waived: items.every((i) => i.waived) });
   });
@@ -142,7 +148,7 @@ let showWaived = false;
 P.home = () => HOME();
 function monthTotals(y) {
   const pay = Array(12).fill(0), oth = Array(12).fill(0);
-  B.forEach((b) => (b.fees[y] || []).forEach((l) => Object.entries(l.m).forEach(([k, v]) => { (l.svc === 'Payroll' ? pay : oth)[k - 1] += v; })));
+  B.forEach((b) => (b.fees[y] || []).forEach((l) => Object.entries(l.m).forEach(([k, v]) => { if (isPd(l, k)) (l.svc === 'Payroll' ? pay : oth)[k - 1] += v; }))); // v21: paid only
   return { pay, oth };
 }
 
@@ -177,7 +183,7 @@ const hasBK = (b, y = CYS) => (b.fees[y] || []).some((l) => l.svc === 'Bookkeepi
 const everBK = (b) => Object.values(b.fees).flat().some((l) => l.svc === 'Bookkeeping');
 function yearRows(b, y) { // per service: Q1..Q4, extra
   const out = {}; const add = (k, q, v) => { const o = (out[k] ||= { q: [0, 0, 0, 0], x: 0 }); if (q === 'x') o.x += v; else o.q[q] += v; };
-  (b.fees[y] || []).forEach((l) => { const k = l.svc === 'Payroll' || l.svc === 'Bookkeeping' ? l.svc : 'Other'; [1, 2, 3, 4].forEach((q) => add(k, q - 1, qSum(l, q))); if (l.extra) add(k, 'x', l.extra); });
+  (b.fees[y] || []).forEach((l) => { const k = l.svc === 'Payroll' || l.svc === 'Bookkeeping' ? l.svc : 'Other'; [1, 2, 3, 4].forEach((q) => add(k, q - 1, qPaid(l, q))); if (l.extra && isPd(l, 'x')) add(k, 'x', l.extra); }); // v21: paid only
   (b.f1099[y] || []).forEach((o) => add('1099', 'x', o.amt));
   noteFees(b, y).forEach((n) => add('Other', Math.ceil(+n.d.slice(5, 7) / 3) - 1, n.amt));
   return out;
@@ -203,7 +209,7 @@ function bizBody(b, inPop) {
     <div class="kvbox">${kv('Pay period & fee', p ? `${pp(p.active ? p.period : '')} <b class="num">${feeTxt(b)}</b><span class="muted small"> / month</span>` : '<span class="faint">N/a</span>')}${kv('Address', cp(b.addr))}${kv('Phone', cp(b.phone))}${kv('Email', cp(b.email))}${kv('Owner', cp(b.owner))}${kv('Owner SSN', cp(b.fk.ssn, 'num'))}${kv('Business bank', p && p.has_bank ? cp(b.fk.bank, 'num') : '<span class="faint">—</span>')}</div>
   </div>
   <div class="bd-grid">
-    <div><h2 class="bd-h">Linked records</h2><table class="t lk"><tbody>${links.map(([s, t]) => `<tr><td><b>${s}</b></td><td>${t}</td></tr>`).join('')}</tbody></table></div>
+    <div><h2 class="bd-h">Linked records</h2><table class="t lk"><tbody>${links.map(([s, t]) => `<tr><td><b>${s}</b></td><td>${t}</td></tr>`).join('')}</tbody></table>${repModeBox(b)}</div>
     <div><h2 class="bd-h">Fees paid</h2>${years.length ? `<table class="t qf"><thead><tr><th>Year</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th><th>Extra</th><th>Total</th></tr></thead><tbody>
       ${years.map((y) => { const S = yearRows(b, y); const q = [0, 1, 2, 3].map((i) => Object.values(S).reduce((s, o) => s + o.q[i], 0)); const x = Object.values(S).reduce((s, o) => s + o.x, 0);
         const sub = ['Payroll', 'Bookkeeping', '1099', 'Other'].filter((k) => S[k]).map((k) => `<tr class="sv-row hidden" data-m="${y}"><td class="svn svn-${k}">${k === 'Other' ? 'Other' : k}</td>${S[k].q.map((v) => `<td class="${v ? '' : 'z'}">${v ? usd(v) : '–'}</td>`).join('')}<td class="${S[k].x ? '' : 'z'}">${S[k].x ? usd(S[k].x) : '–'}</td><td>${usd(S[k].q.reduce((a, v) => a + v, 0) + S[k].x)}</td></tr>`).join('');
@@ -213,6 +219,12 @@ function bizBody(b, inPop) {
   <div class="bd-notes"><h2 class="bd-h">Notes</h2>
     <div class="addnote an3"><textarea data-nt="${b.id}" placeholder="Add a note…"></textarea><label class="amt"><span>Fee paid</span><input type="text" data-na="${b.id}" placeholder="$" inputmode="decimal"></label><button class="btn green" data-addnote="${b.id}">Add note</button></div>
     <div data-nl="${b.id}">${notesTable(b)}</div></div>`;
+}
+// v21: Payroll report per quarter (Monthly / Quarterly), editable here
+function repModeBox(b) {
+  if (!b.payroll || !b.payroll.active) return '';
+  const y = PQ.y; return `<div class="rm21"><div class="rm21h"><b>Payroll report ${y}</b></div><div class="rm21g">${[1, 2, 3, 4].map((q) => { const md0 = modeOf(b, y, q);
+    return `<div class="rm21q ${q === CQ() && y === CY ? 'cur' : ''}"><span>Q${q}</span><div class="seg21">${[['M', 'Monthly'], ['Q', 'Quarterly']].map(([k, t]) => `<button data-rm="${b.id}|${y}|${q}|${k}" class="${md0 === k ? 'on' : ''}">${t}</button>`).join('')}</div></div>`; }).join('')}</div></div>`;
 }
 const notesTable = (b) => b.notes.length ? `<table class="notes-t"><thead><tr><th style="width:56px">Year</th><th>Comment</th><th class="right" style="width:90px">Fee paid</th><th style="width:105px">Created On</th><th style="width:120px">Added By</th></tr></thead><tbody>${[...b.notes].sort((a, c) => c.d.localeCompare(a.d)).map((n) => `<tr><td>${n.d.slice(0, 4)}</td><td>${esc(n.txt)}</td><td class="right num ${n.amt ? 'nfee' : 'faint'}">${n.amt ? usd(n.amt) : ''}</td><td>${md(n.d)}</td><td>${esc(n.by)} <button class="link faint" data-delnote="${b.id}|${n.id}" title="Xóa note">×</button></td></tr>`).join('')}</tbody></table>` : '';
 P.b = (id) => byId[id] ? `<div class="bd-page">${bizBody(byId[id], false)}</div>` : 'Not found';
@@ -290,12 +302,13 @@ const GLABEL = { ...PLABEL, Bookkeeping: 'Bookkeeping', Other: 'Other income (sa
 const sideAll = () => DATA.side.concat(added1099);
 function yearParts(y) {
   let pay = 0, bk = 0, oth = 0; const nPay = new Set(), nBk = new Set();
-  B.forEach((b) => (b.fees[y] || []).forEach((l) => { const s = Object.values(l.m).reduce((a, v) => a + v, 0);
-    if (l.svc === 'Payroll') { pay += s; if (s) nPay.add(b.id); } else if (l.svc === 'Bookkeeping') { bk += s; if (s) nBk.add(b.id); } else oth += s; oth += l.extra || 0; }));
+  let open = 0; // v21: paid = highlighted; open = numbers not highlighted yet (expecting)
+  B.forEach((b) => (b.fees[y] || []).forEach((l) => { const s = lineSum(l) - (l.extra && isPd(l, 'x') ? l.extra : 0); open += lineSum(l, false);
+    if (l.svc === 'Payroll') { pay += s; if (s) nPay.add(b.id); } else if (l.svc === 'Bookkeeping') { bk += s; if (s) nBk.add(b.id); } else oth += s; oth += l.extra && isPd(l, 'x') ? l.extra : 0; }));
   const S = sideAll().filter((o) => String(o.year) === y); const side = S.reduce((s, o) => s + o.amt, 0);
   const F = B.filter((b) => b.formation && b.formation.date.startsWith(y)); const form = F.reduce((s, b) => s + (b.formation.fee || 0), 0);
   oth += B.reduce((s, b) => s + noteFees(b, y).reduce((a, n) => a + n.amt, 0), 0); // v5: fee written in a note = other income
-  return { pay, bk, oth: oth + side, form, tot: pay + bk + oth + side, nPay: nPay.size, nBk: nBk.size, n99: S.filter((o) => o.kind === '1099').length, nForm: F.length };
+  return { open, pay, bk, oth: oth + side, form, tot: pay + bk + oth + side, nPay: nPay.size, nBk: nBk.size, n99: S.filter((o) => o.kind === '1099').length, nForm: F.length };
 }
 P.fees = (focus) => { if (focus) feeTab = 'payroll'; return `<div class="page-head"><div><h1>Fees</h1></div><div class="btnrow"><button class="btn" data-pa="price">Price list</button></div></div>
   <div class="tabs">${[['payroll', 'Payroll & Bookkeeping'], ['1099', '1099'], ['summary', 'Summary']].map(([k, t]) => `<button data-ft="${k}" class="${feeTab === k ? 'on' : ''}">${t}</button>`).join('')}</div>
@@ -303,7 +316,7 @@ P.fees = (focus) => { if (focus) feeTab = 'payroll'; return `<div class="page-he
 function feesPayroll(focus) {
   const q = feeView === 'quarter';
   const bar = `<div class="fbar"><div class="tabs plain"><button data-fv="month" class="${!q ? 'on' : ''}">Months</button><button data-fv="quarter" class="${q ? 'on' : ''}">Quarters</button></div>
-    ${!q ? `<span class="fpal"><span class="muted small">Highlight:</span>${HL.map(([c, n]) => `<button class="sw2" data-hl="${c}" title="${n}" style="background:${c}"></button>`).join('')}<button class="sw2 x" data-hl="" title="No color">×</button></span>` : ''}
+    ${!q ? `<span class="fpal"><span class="muted small">Paid:</span>${HL.map(([c, n]) => `<button class="sw2" data-hl="${c}" title="${n} = paid" style="background:${c}"></button>`).join('')}<button class="sw2 x" data-hl="" title="Bỏ màu = chưa paid">×</button></span><span class="fleg21"><i class="pd"></i>tô màu = paid <i class="ex"></i>số chưa tô = expecting</span>` : ''}
     <span class="pr-leg">${PERIODS.map((p) => `<span><i class="sw pc-${p}"></i>${p}</span>`).join('')}<span><i class="sw pc-Bookkeeping"></i>Bookkeeping</span></span></div>`;
   return bar + YEARS.map((y) => feeYear(y, q, focus)).join('');
 }
@@ -313,19 +326,26 @@ function feeYear(y, q, focus) {
   sideAll().filter((o) => o.kind === 'Annual' && String(o.year) === y).forEach((o) => rows.push({ b: byId[o.bid] || { id: 'na', name: o.name, payroll: null }, l: { svc: 'Annual', m: {}, extra: o.amt, flags: [], hl: {}, virt: 'Annual fee (cột ANNUAL sheet 2024)' }, li: -1 })); // v20.1: Annual fee = its own row, not a 1099 footnote
   if (!rows.length) return '';
   const grp = (r) => r.l.svc === 'Bookkeeping' ? 'Bookkeeping' : r.l.svc !== 'Payroll' ? 'Other' : r.b.payroll && r.b.payroll.active ? r.b.payroll.period : 'Inactive';
-  const sumM = (k) => rows.reduce((s, r) => s + (r.l.m[k] || 0), 0); const ext = rows.reduce((s, r) => s + (r.l.extra || 0), 0);
-  const tot = rows.reduce((s, r) => s + Object.values(r.l.m).reduce((a, v) => a + v, 0) + (r.l.extra || 0), 0);
-  const ncol = q ? 7 : 15;
-  const line = ({ b, l, li }) => { const t = Object.values(l.m).reduce((a, v) => a + v, 0) + (l.extra || 0); const fl = Object.fromEntries(l.flags.map((f) => [f.split(':')[0], f.split(':')[1]])); l.hl ||= {};
-    const cell = (m) => l.virt ? `<td class="${l.m[m] ? 'nfee' : 'z'}" title="${esc(l.virt)}">${l.m[m] ? Math.round(l.m[m]) : ''}</td>` : fl[m] ? `<td class="fl" title="${esc(fl[m])}">${esc(fl[m].trim().split(' ')[0].slice(0, 6))}</td>` : `<td class="fc ${l.m[m] != null ? '' : 'z'} ${selCells.includes(`${b.id}|${y}|${li}|${m}`) ? 'sel' : ''}" data-cell="${b.id}|${y}|${li}|${m}" style="${l.hl[m] ? 'background:' + l.hl[m] : ''}">${l.m[m] != null ? Math.round(l.m[m]) : ''}</td>`;
+  // v21: totals = PAID (highlighted). Open = numbers not highlighted (expecting)
+  const sumM = (k, paid = true) => rows.reduce((s, r) => s + (r.l.m[k] && isPd(r.l, String(k)) === paid ? r.l.m[k] : 0), 0);
+  const extP = (paid = true) => rows.reduce((s, r) => s + (r.l.extra && isPd(r.l, 'x') === paid ? r.l.extra : 0), 0);
+  const tot = rows.reduce((s, r) => s + lineSum(r.l), 0), open = rows.reduce((s, r) => s + lineSum(r.l, false), 0);
+  const ncol = q ? 8 : 16;
+  const line = ({ b, l, li }) => { const t = lineSum(l), o = lineSum(l, false); const fl = Object.fromEntries(l.flags.map((f) => [f.split(':')[0], f.split(':')[1]])); l.hl ||= {};
+    const key = (m) => `${b.id}|${y}|${li}|${m}`;
+    const cell = (m) => l.virt ? `<td class="${l.m[m] ? 'nfee' : 'z'}" title="${esc(l.virt)}">${l.m[m] ? Math.round(l.m[m]) : ''}</td>` : fl[m] ? `<td class="fl" title="${esc(fl[m])}">${esc(fl[m].trim().split(' ')[0].slice(0, 6))}</td>` : `<td class="fc ${l.m[m] != null ? (l.hl[m] ? 'pd21' : 'ex21') : 'z'} ${selCells.includes(key(m)) ? 'sel' : ''}" data-cell="${key(m)}" style="${l.hl[m] ? 'background:' + l.hl[m] : ''}">${l.m[m] != null ? Math.round(l.m[m]) : ''}</td>`;
+    const xcell = l.virt ? `<td class="nfee ${l.extra ? '' : 'z'}">${l.extra ? Math.round(l.extra) : ''}</td>` : `<td class="fc ${l.extra ? (l.hl.x ? 'pd21' : 'ex21') : 'z'} ${selCells.includes(key('x')) ? 'sel' : ''}" data-cell="${key('x')}" style="${l.hl.x ? 'background:' + l.hl.x : ''}">${l.extra ? Math.round(l.extra) : ''}</td>`;
     const isF = y === CYS && String(focus) === String(b.id) && l.svc === 'Bookkeeping';
-    return `<tr class="${isF ? 'focus' : ''}" ${isF ? 'id="ffocus"' : ''}><td class="fname pc-${grp({ b, l })}"><a href="#/p/b/${b.id}" data-biz="${b.id}">${esc(b.name)}</a>${l.svc !== 'Payroll' && l.svc !== 'Bookkeeping' ? ` <span class="small" style="color:var(--orange-ink)">${l.svc}</span>` : ''}</td>${q ? [1, 2, 3, 4].map((k) => { const v = qSum(l, k); return `<td class="${v ? '' : 'z'}">${v ? usd(v) : ''}</td>`; }).join('') : MON.map((_, i) => cell(i + 1)).join('')}<td class="fc ${l.extra ? '' : 'z'}" ${l.virt ? '' : `data-cell="${b.id}|${y}|${li}|x"`}>${l.extra ? Math.round(l.extra) : ''}</td><td><b>${usd(t)}</b></td></tr>`; };
+    const qc = (k) => { const v = qPaid(l, k), w = qPaid(l, k, false); return `<td class="${v || w ? '' : 'z'}">${v ? usd(v) : ''}${w ? `<span class="op21">+${usd(w)}</span>` : ''}</td>`; };
+    return `<tr class="${isF ? 'focus' : ''}" ${isF ? 'id="ffocus"' : ''}><td class="fname pc-${grp({ b, l })}"><a href="#/p/b/${b.id}" data-biz="${b.id}">${esc(b.name)}</a>${l.svc !== 'Payroll' && l.svc !== 'Bookkeeping' ? ` <span class="small" style="color:var(--orange-ink)">${l.svc}</span>` : ''}</td>${q ? [1, 2, 3, 4].map(qc).join('') : MON.map((_, i) => cell(i + 1)).join('')}${xcell}<td class="pdt21"><b>${t ? usd(t) : ''}</b></td><td class="opt21">${o ? usd(o) : ''}</td></tr>`; };
   const groups = [...PERIODS, 'Bookkeeping', 'Other', 'Inactive'].map((g) => { const R = rows.filter((r) => grp(r) === g).sort((a, c) => a.b.name.localeCompare(c.b.name)); if (!R.length) return '';
-    const gt = R.reduce((s, r) => s + Object.values(r.l.m).reduce((a, v) => a + v, 0) + (r.l.extra || 0), 0);
-    return `<tr class="psec psec-${g}"><td colspan="${ncol - 1}">${esc(GLABEL[g])} <span class="n">${R.length}</span></td><td class="right">${usd(gt)}</td></tr>${R.map(line).join('')}`; }).join('');
-  return `<div class="fyear"><div class="fyh"><h2>${y}</h2><b>${usd(tot)}</b></div>
-    <div style="overflow-x:auto"><table class="t ft"><thead><tr><th>Business</th>${q ? '<th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th>' : MON.map((m) => `<th>${m}</th>`).join('')}<th>Extra</th><th>Total</th></tr></thead><tbody>
-    ${groups}<tr class="tot"><td>Total</td>${q ? [1, 2, 3, 4].map((k) => `<td>${usd([1, 2, 3].reduce((s, j) => s + sumM((k - 1) * 3 + j), 0))}</td>`).join('') : MON.map((_, i) => `<td>${usd(sumM(i + 1))}</td>`).join('')}<td>${usd(ext)}</td><td>${usd(tot)}</td></tr></tbody></table></div></div>`;
+    const gt = R.reduce((s, r) => s + lineSum(r.l), 0), go = R.reduce((s, r) => s + lineSum(r.l, false), 0);
+    return `<tr class="psec psec-${g}"><td colspan="${ncol - 2}">${esc(GLABEL[g])} <span class="n">${R.length}</span></td><td class="right">${usd(gt)}</td><td class="right opt21">${go ? usd(go) : ''}</td></tr>${R.map(line).join('')}`; }).join('');
+  const qsum = (k, paid) => [1, 2, 3].reduce((s, j) => s + sumM((k - 1) * 3 + j, paid), 0);
+  return `<div class="fyear"><div class="fyh"><h2>${y}</h2><span class="fyk21"><span>Paid <b>${usd(tot)}</b></span>${open ? `<span class="o">Expecting <b>${usd(open)}</b></span>` : ''}</span></div>
+    <div style="overflow-x:auto"><table class="t ft ft21"><thead><tr><th>Business</th>${q ? '<th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th>' : MON.map((m) => `<th>${m}</th>`).join('')}<th>Extra</th><th>Paid</th><th class="opt21">Expecting</th></tr></thead><tbody>
+    ${groups}<tr class="tot"><td>Paid</td>${q ? [1, 2, 3, 4].map((k) => `<td>${usd(qsum(k, true))}</td>`).join('') : MON.map((_, i) => `<td>${usd(sumM(i + 1))}</td>`).join('')}<td>${usd(extP())}</td><td>${usd(tot)}</td><td></td></tr>
+    ${open ? `<tr class="tot op21r"><td>Expecting</td>${q ? [1, 2, 3, 4].map((k) => `<td>${qsum(k, false) ? usd(qsum(k, false)) : ''}</td>`).join('') : MON.map((_, i) => `<td>${sumM(i + 1, false) ? usd(sumM(i + 1, false)) : ''}</td>`).join('')}<td>${extP(false) ? usd(extP(false)) : ''}</td><td></td><td>${usd(open)}</td></tr>` : ''}</tbody></table></div></div>`;
 }
 function fees1099() {
   const all = sideAll().filter((o) => o.kind === '1099');
@@ -388,7 +408,7 @@ document.addEventListener('click', (e) => {
   const lk = t.closest('a[href^="#/p/"]'); if (lk && !t.closest('[data-biz]')) { e.preventDefault(); $$('.pay19.ovw').forEach((o) => { if (lk.closest('.ovw') === o) o.remove(); }); if (lk.dataset.ftGo) feeTab = lk.dataset.ftGo; go(lk.getAttribute('href').slice(4)); window.scrollTo(0, 0); return; }
   const cpx = t.closest('[data-copy]'); if (cpx) { e.preventDefault(); navigator.clipboard?.writeText(cpx.dataset.copy).catch(() => {}); $$('.copied-t').forEach((x) => x.remove()); cpx.classList.add('copied'); const m = document.createElement('span'); m.className = 'copied-t'; m.textContent = 'Copied ✓'; cpx.after(m); setTimeout(() => { cpx.classList.remove('copied'); m.remove(); }, 2000); return; }
   const em = t.closest('[data-email]'); if (em) { e.preventDefault(); emailModal(em.dataset.email); return; }
-  const tk = t.closest('[data-tick]'); if (tk) { const [id, k] = tk.dataset.tick.split('|'); const R = byId[id].rep[PQ.y]; const arr = k[0] === 'm' ? R.m : R.q; const i = +k.slice(1); const was = arr[i]; arr[i] = was ? 0 : 1; render.keep = true; render();
+  const tk = t.closest('[data-tick]'); if (tk) { const [id, k] = tk.dataset.tick.split('|'); const c = quarterCells(byId[id], PQ.y, PQ.q); const R = c.R; const arr = k[0] === 'm' ? R.m : R.q; const i = +k.slice(1); const was = arr[i]; const shown = k[0] === 'm' ? c.m[i - (PQ.q - 1) * 3] : c.q; arr[i] = shown ? 0 : 1; render.keep = true; render();
     api('PUT', '/pr/tick', { bid: +id, year: PQ.y, slot: k[0] + (i + 1), done: !!arr[i] }).catch((er) => { arr[i] = was; render.keep = true; render(); failT(er); }); return; }
   const bz = t.closest('[data-biz]'); if (bz && bz.dataset.biz === 'na') { e.preventDefault(); return; } if (bz && !t.closest('[data-copy],[data-email],button:not([data-biz])')) { e.preventDefault(); if (OPEN_MODE === 'page') go('b/' + bz.dataset.biz); else openBiz(bz.dataset.biz); return; }
   const f = t.closest('#bf [data-f]'); if (f) { LS.f = f.dataset.f; render.keep = true; render(); return; }
@@ -396,9 +416,10 @@ document.addEventListener('click', (e) => {
   const pq = t.closest('[data-pq]'); if (pq) { PQ.q = +pq.dataset.pq; render.keep = true; render(); return; }
   const py = t.closest('[data-py]'); if (py) { PQ.y += +py.dataset.py; render.keep = true; render(); return; }
   const ft = t.closest('[data-ft]'); if (ft) { feeTab = ft.dataset.ft; selCells = []; render.keep = true; render(); return; }
-  const fc = t.closest('td[data-cell]'); if (fc && !fc.querySelector('input')) { const k = fc.dataset.cell; if (e.ctrlKey || e.metaKey) { selCells = selCells.includes(k) ? selCells.filter((x) => x !== k) : [...selCells, k]; } else selCells = [k]; $$('td.fc.sel').forEach((x) => x.classList.remove('sel')); selCells.forEach((s) => { const c = $(`td[data-cell="${s}"]`); if (c) c.classList.add('sel'); }); return; }
-  const hl = t.closest('[data-hl]'); if (hl) { if (!selCells.length) { toast('Bấm chọn 1 ô trước'); return; } const cells = []; selCells.forEach((s) => { const [id, y, li, m] = s.split('|'); const l = byId[id].fees[y][li]; if (!l || !l.id) return; l.hl ||= {}; if (hl.dataset.hl) l.hl[m] = hl.dataset.hl; else delete l.hl[m]; cells.push([l.id, m]); const c = $(`td[data-cell="${s}"]`); if (c) c.style.background = hl.dataset.hl; });
-    api('PUT', '/pr/fee/hl', { cells, color: hl.dataset.hl }).then(() => toast(hl.dataset.hl ? 'Highlighted' : 'Color removed')).catch(failT); return; }
+  if (t.closest('td[data-cell]')) return; // v21: selection handled on mousedown (drag like Excel)
+  const rm = t.closest('[data-rm]'); if (rm) { const [id, y, q, md0] = rm.dataset.rm.split('|'); const b = byId[id]; const a = ((b.modes ||= {})[y] ||= [1, 2, 3, 4].map((k) => modeOf(b, +y, k))); const was = a[q - 1]; a[q - 1] = md0;
+    openBiz(b.id); render.keep = true; render(); api('PUT', '/pr/mode', { bid: b.id, year: +y, q: +q, mode: md0 }).then(() => toast(`Q${q} ${y}: report ${md0 === 'M' ? 'Monthly' : 'Quarterly'}`)).catch((er) => { a[q - 1] = was; openBiz(b.id); failT(er); }); return; }
+  const hl = t.closest('[data-hl]'); if (hl) { applyHl21(hl.dataset.hl); return; }
   const fv = t.closest('[data-fv]'); if (fv) { feeView = fv.dataset.fv; render.keep = true; render(); return; }
   const yr = t.closest('tr[data-yr]'); if (yr) { const box = yr.closest('.bmodal, #paypage'); const L = $$(`tr[data-m="${yr.dataset.yr}"]`, box); const open = L.length && L[0].classList.contains('hidden'); L.forEach((x) => x.classList.toggle('hidden', !open)); yr.classList.toggle('open', open); return; }
   const tr = t.closest('[data-try]'); if (tr) { e.preventDefault(); sq = tr.dataset.try; render(); return; }
@@ -425,18 +446,58 @@ document.addEventListener('click', (e) => {
   else if (act === 'newfm') editForm(null, { formation: true });
   else SET_ACT(act, a);
 });
+// v21: select fee cells like Excel - drag, Shift + click = range, Ctrl/⌘ + click = add. Bar at the bottom: sum + mark paid
+let SEL = { a: null, drag: false, base: [] };
+const cellPos = (td) => { const tr = td.parentElement; return { tb: td.closest('table'), r: [...tr.parentElement.children].indexOf(tr), c: td.cellIndex }; };
+function rangeKeys(a, b) {
+  if (!a || !b || a.tb !== b.tb) return [b.td.dataset.cell]; const rows = [...a.tb.tBodies[0].rows]; const out = [];
+  for (let r = Math.min(a.r, b.r); r <= Math.max(a.r, b.r); r++) [...rows[r].cells].forEach((td) => { if (td.cellIndex >= Math.min(a.c, b.c) && td.cellIndex <= Math.max(a.c, b.c) && td.dataset.cell) out.push(td.dataset.cell); });
+  return out;
+}
+const cellLine = (k) => { const [id, y, li, m] = k.split('|'); const l = byId[id] && byId[id].fees[y] && byId[id].fees[y][li]; return l ? { l, m, v: m === 'x' ? l.extra : l.m[m] } : null; };
+function paintSel() {
+  $$('td.fc.sel').forEach((x) => x.classList.remove('sel')); const S1 = new Set(selCells); $$('td.fc[data-cell]').forEach((td) => { if (S1.has(td.dataset.cell)) td.classList.add('sel'); });
+  let bar = $('#selbar21'); if (!selCells.length || S.page !== 'pay') { if (bar) bar.remove(); return; }
+  let n = 0, sum = 0, pd = 0; selCells.forEach((k) => { const c = cellLine(k); if (!c || !c.v) return; n++; sum += c.v; if (isPd(c.l, c.m)) pd += c.v; });
+  if (!bar) { bar = document.createElement('div'); bar.id = 'selbar21'; bar.className = 'pay19 selbar21'; document.body.appendChild(bar); }
+  bar.innerHTML = `<span class="sb-n"><b>${selCells.length}</b> ô${n !== selCells.length ? ` · ${n} có số` : ''}</span><span>Sum <b>${usd(sum)}</b></span><span class="sb-p">Paid <b>${usd(pd)}</b></span><span class="sb-o">Expecting <b>${usd(sum - pd)}</b></span>
+    <span class="sb-act"><button class="btn green sm" data-hl="#c8e6c9">✓ Mark paid</button>${HL.filter(([c]) => c !== '#c8e6c9').map(([c, nm]) => `<button class="sw2" data-hl="${c}" title="Paid · ${nm}" style="background:${c}"></button>`).join('')}<button class="btn sm" data-hl="">Chưa paid</button><button class="link faint" data-selx>Esc</button></span>`;
+}
+function applyHl21(color) {
+  if (!selCells.length) { toast('Kéo chọn ô trước'); return; } const cells = [];
+  selCells.forEach((k) => { const c = cellLine(k); if (!c || !c.l.id || !c.v) return; c.l.hl ||= {}; if (color) c.l.hl[c.m] = color; else delete c.l.hl[c.m]; cells.push([c.l.id, c.m]); });
+  if (!cells.length) { toast('Các ô chọn chưa có số'); return; }
+  render.keep = true; render(); paintSel();
+  api('PUT', '/pr/fee/hl', { cells, color }).then(() => toast(color ? `${cells.length} ô = paid` : `${cells.length} ô = expecting`)).catch(failT);
+}
+document.addEventListener('mousedown', (e) => {
+  const td = e.target.closest && e.target.closest('td.fc[data-cell]'); if (!td || !inPay(td) || td.querySelector('input') || e.button !== 0) return;
+  e.preventDefault(); const k = td.dataset.cell; const P0 = { ...cellPos(td), td }; SEL.moved = false;
+  if (e.shiftKey && SEL.a) { e.preventDefault(); selCells = [...new Set([...SEL.base, ...rangeKeys(SEL.a, P0)])]; paintSel(); return; }
+  if (e.ctrlKey || e.metaKey) { SEL.base = selCells.includes(k) ? selCells.filter((x) => x !== k) : [...selCells, k]; selCells = SEL.base.slice(); }
+  else { SEL.base = []; selCells = [k]; }
+  SEL.a = P0; SEL.drag = true; document.body.classList.add('drag21'); paintSel();
+});
+document.addEventListener('mouseover', (e) => {
+  if (!SEL.drag) return; const td = e.target.closest && e.target.closest('td.fc[data-cell]'); if (!td) return;
+  SEL.moved = true; selCells = [...new Set([...SEL.base, ...rangeKeys(SEL.a, { ...cellPos(td), td })])]; paintSel();
+});
+document.addEventListener('mouseup', () => { if (SEL.drag) { SEL.drag = false; document.body.classList.remove('drag21'); if (selCells.length === 1 && !SEL.base.length) SEL.base = []; } });
+document.addEventListener('click', () => setTimeout(() => { if (!$('.ft21') && (selCells.length || $('#selbar21'))) { selCells = []; SEL.a = null; const b = $('#selbar21'); if (b) b.remove(); } }, 0));
+document.addEventListener('click', (e) => { if (e.target.closest('[data-selx]') || (selCells.length && !e.target.closest('table.ft21, #selbar21, .fpal, .ovw') && S.page === 'pay')) { selCells = []; SEL.a = null; paintSel(); } });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && selCells.length && !e.target.closest('input')) { selCells = []; SEL.a = null; paintSel(); } });
 // v3: double-click edit (fee cells + payroll note). Enter = save, Esc = cancel
 document.addEventListener('dblclick', (e) => {
   if (!inPay(e.target)) return;
   const fc = e.target.closest('td.fc[data-cell]'); const pn = e.target.closest('td[data-pnote]');
   if (fc && !fc.querySelector('input')) { const [id, y, li, m] = fc.dataset.cell.split('|'); const l = byId[id].fees[y][li]; const cur = m === 'x' ? l.extra : l.m[m];
-    fc.innerHTML = `<input class="cell-in" value="${cur || ''}" inputmode="decimal">`; const i = $('input', fc); i.focus(); i.select();
+    const i = cellEdit21(fc, cur || '', { num: 1 }); // v21: editor floats over the cell, column width never changes
     let fin = false; const done = (save) => { if (fin) return; fin = true; const raw = i.value.trim(); const v = raw === '' ? null : Number(raw.replace(/[$,]/g, ''));
       if (save && raw !== String(cur ?? '') && (v === null || Number.isFinite(v))) { const old = m === 'x' ? l.extra : l.m[m]; if (m === 'x') l.extra = v || 0; else if (v !== null) l.m[m] = v; else delete l.m[m];
-        api('PUT', '/pr/fee', { line_id: l.id, month: m, value: v }).then(() => toast(v ? 'Saved · received ' + usd(v) : 'Cleared · chưa trả')).catch((er) => { if (m === 'x') l.extra = old; else if (old == null) delete l.m[m]; else l.m[m] = old; render.keep = true; render(); failT(er); }); }
+        api('PUT', '/pr/fee', { line_id: l.id, month: m, value: v }).then(() => toast(v ? `Saved · ${l.hl && l.hl[m] ? 'paid' : 'expecting'} ` + usd(v) : 'Cleared')).catch((er) => { if (m === 'x') l.extra = old; else if (old == null) delete l.m[m]; else l.m[m] = old; render.keep = true; render(); failT(er); }); }
       render.keep = true; render(); };
     i.onkeydown = (k) => { if (k.key === 'Enter') done(true); if (k.key === 'Escape') { k.stopPropagation(); done(false); } }; i.onblur = () => done(true); return; }
-  if (pn && !pn.querySelector('input')) { const b = byId[pn.dataset.pnote]; pn.innerHTML = `<input class="cell-in wide" value="${esc(b.pnote || '')}" placeholder="Note…">`; const i = $('input', pn); i.focus();
+  if (pn && !pn.querySelector('input')) { const b = byId[pn.dataset.pnote]; const i = cellEdit21(pn, b.pnote || '', { left: 1, ph: 'Note…' });
     let fin = false; const done = (save) => { if (fin) return; fin = true; const v = i.value.trim(); if (save && v !== (b.pnote || '')) { const old = b.pnote; b.pnote = v; api('PUT', '/pr/pnote', { bid: b.id, note: v }).then(() => toast('Saved')).catch((er) => { b.pnote = old; render.keep = true; render(); failT(er); }); } render.keep = true; render(); };
     i.onkeydown = (k) => { if (k.key === 'Enter') done(true); if (k.key === 'Escape') { k.stopPropagation(); done(false); } }; i.onblur = () => done(true); }
 });
@@ -485,7 +546,7 @@ function HOME() {
     : `<div class="muted small" style="padding:6px 0">${NEWS ? 'Chưa có tin · tự lấy mỗi thứ Hai (Settings › News › Pull now)' : 'Đang tải…'}</div>`}</div>
   <div class="grid2">
     <div class="card"><div class="card-head"><h2>Not received yet</h2>${wv.length ? `<button class="link small" data-pa="waived">${showWaived ? 'Ẩn' : 'Xem'} đã waive (${wv.length})</button>` : ''}</div>
-      ${due.length ? `<table class="t"><tbody>${due.map((o) => `<tr class="click" data-biz="${o.b.id}"><td class="pc ${o.b.payroll && o.b.payroll.active ? 'pc-' + o.b.payroll.period : 'pc-Other'}" style="width:6px;padding:0"></td><td class="name-cell">${esc(o.b.name)}</td><td class="small muted">${o.items.filter((i) => !i.waived).map((i) => i.label + (i.svc !== 'Payroll' ? ' (' + i.svc + ')' : '')).join(', ')}</td><td class="right num late">${usd(o.total)}</td><td class="right"><button class="link" data-waive="${o.b.id}">Waive</button></td></tr>`).join('')}</tbody></table>` : '<div class="muted" style="padding:6px 0">All received ✓</div>'}
+      ${due.length ? `<table class="t"><tbody>${due.map((o) => `<tr class="click" data-biz="${o.b.id}"><td class="pc ${o.b.payroll && o.b.payroll.active ? 'pc-' + o.b.payroll.period : 'pc-Other'}" style="width:6px;padding:0"></td><td class="name-cell">${esc(o.b.name)}</td><td class="small muted">${dueTxt21(o.items.filter((i) => !i.waived))}</td><td class="right num late">${usd(o.total)}</td><td class="right"><button class="link" data-waive="${o.b.id}">Waive</button></td></tr>`).join('')}</tbody></table>` : '<div class="muted" style="padding:6px 0">All received ✓</div>'}
       ${showWaived ? `<table class="t waived"><tbody>${wv.map((o) => `<tr><td class="faint">${esc(o.b.name)}</td><td class="small faint">${o.items.filter((i) => i.waived).map((i) => i.label).join(', ')}</td><td class="right num faint"><s>${usd(o.items.filter((i) => i.waived).reduce((s, i) => s + i.amt, 0))}</s></td><td class="right"><button class="link" data-unwaive="${o.b.id}">Undo</button></td></tr>`).join('')}</tbody></table>` : ''}</div>
     <div class="card"><div class="card-head"><h2>Q${q} progress</h2></div>
       ${prog.map((x) => `<div class="pgl"><span class="l">${pp(x.p)} <span class="muted small">${x.n}</span></span><span class="trk2"><span class="trk"><i class="pi-${x.p}" style="width:${x.t ? x.d / x.t * 100 : 0}%"></i></span>${ti('tip" style="left:' + (x.t ? x.d / x.t * 100 : 0) + '%')}</span><b>${x.d}/${x.t}</b></div>`).join('')}</div>
@@ -499,18 +560,18 @@ function feesSummary() {
   const chg = (a, b) => { const v = pct(a, b); return v == null ? '' : `<span class="${v >= 0 ? 'up' : 'dn'}">${v >= 0 ? '▲' : '▼'} ${Math.abs(v)}%</span>`; };
   const dif = (a, b) => { const v = a - b; return v ? `<span class="${v > 0 ? 'up' : 'dn'}">${v > 0 ? '+' : ''}${v}</span>` : '<span class="muted">±0</span>'; };
   const mx = Math.max(...Y.map((x) => x.tot), 1); const C = ['#7fb2e0', '#8fc9a8', '#f0c27b', '#b39ddb'];
-  const A = Y.reduce((a, x) => ({ pay: a.pay + x.pay, bk: a.bk + x.bk, oth: a.oth + x.oth, form: a.form + x.form, tot: a.tot + x.tot, nForm: a.nForm + x.nForm }), { pay: 0, bk: 0, oth: 0, form: 0, tot: 0, nForm: 0 });
+  const A = Y.reduce((a, x) => ({ open: a.open + x.open, pay: a.pay + x.pay, bk: a.bk + x.bk, oth: a.oth + x.oth, form: a.form + x.form, tot: a.tot + x.tot, nForm: a.nForm + x.nForm }), { open: 0, pay: 0, bk: 0, oth: 0, form: 0, tot: 0, nForm: 0 });
   const cell = (v, n, u) => `<td class="right num">${v ? usd(v) : '<span class="faint">—</span>'}${n ? `<span class="cnt2">${ti('sm')}${n} ${u}</span>` : ''}</td>`;
-  return `<div class="sum-hero"><div class="ssl">${ti()}Year-to-date ${CYS}</div><div class="hv">${usd(c.tot)}</div><div class="sss">${chg(c.tot, p.tot)} vs ${p.y} (${usd(p.tot)})</div>
+  return `<div class="sum-hero"><div class="ssl">${ti()}Paid · year-to-date ${CYS}</div><div class="hv">${usd(c.tot)}</div><div class="sss">${chg(c.tot, p.tot)} vs ${p.y} (${usd(p.tot)})${c.open ? ` · <span class="op21i">Expecting ${usd(c.open)} chưa paid</span>` : ''}</div>
       <div class="mix">${[c.pay, c.bk, c.oth].map((v, i) => `<i style="width:${c.tot ? v / c.tot * 100 : 0}%;background:${C[i]}"></i>`).join('')}</div></div>
     ${statStrip([[`${ti()}Payroll <i class="dot" style="background:${C[0]}"></i>`, usd(c.pay), `<b>${c.nPay}</b> tiệm (${dif(c.nPay, p.nPay)} vs ${p.y}) · ${chg(c.pay, p.pay)}`],
       [`${ti()}Bookkeeping <i class="dot" style="background:${C[1]}"></i>`, usd(c.bk), `<b>${c.nBk}</b> tiệm (${dif(c.nBk, p.nBk)}) · ${chg(c.bk, p.bk)}`],
       [`${ti()}Other (extra + 1099) <i class="dot" style="background:${C[2]}"></i>`, usd(c.oth), `<b>${c.n99}</b> khách 1099 · ${chg(c.oth, p.oth)}`],
       [`${ti()}Formation <span class="xt20">ngoài total</span>`, `<span class="fm20">${usd(c.form)}</span>`, `<b>${c.nForm}</b> cty (${dif(c.nForm, p.nForm)})`, 'ssoff20']])}
-    <table class="t ycmp fsum20"><thead><tr><th>Year</th><th class="right">Payroll</th><th class="right">Bookkeeping</th><th class="right">Other</th><th class="right">Total</th><th class="right">vs year before</th><th style="width:20%"></th><th class="right fcol20">Formation</th></tr></thead><tbody>
-    ${Y.map((x, i) => `<tr><td><b>${x.y}</b>${i === 0 ? ' <span class="small muted">YTD</span>' : ''}</td>${cell(x.pay, x.nPay, 'tiệm')}${cell(x.bk, x.nBk, 'tiệm')}${cell(x.oth, x.n99, 'khách 1099')}<td class="right num"><b>${usd(x.tot)}</b></td><td class="right">${Y[i + 1] ? chg(x.tot, Y[i + 1].tot) : ''}</td>
+    <table class="t ycmp fsum20"><thead><tr><th>Year</th><th class="right">Payroll</th><th class="right">Bookkeeping</th><th class="right">Other</th><th class="right">Paid</th><th class="right op21i">Expecting</th><th class="right">vs year before</th><th style="width:20%"></th><th class="right fcol20">Formation</th></tr></thead><tbody>
+    ${Y.map((x, i) => `<tr><td><b>${x.y}</b>${i === 0 ? ' <span class="small muted">YTD</span>' : ''}</td>${cell(x.pay, x.nPay, 'tiệm')}${cell(x.bk, x.nBk, 'tiệm')}${cell(x.oth, x.n99, 'khách 1099')}<td class="right num"><b>${usd(x.tot)}</b></td><td class="right num op21i">${x.open ? usd(x.open) : ''}</td><td class="right">${Y[i + 1] ? chg(x.tot, Y[i + 1].tot) : ''}</td>
       <td><span class="ybar">${[x.pay, x.bk, x.oth].map((v, k) => `<i style="width:${v / mx * 100}%;background:${C[k]}"></i>`).join('')}</span></td><td class="right num fcol20">${x.form ? usd(x.form) : '—'}${x.nForm ? `<span class="cnt2">${x.nForm} cty</span>` : ''}</td></tr>`).join('')}
-    <tr class="tot"><td>All years</td><td class="right num">${usd(A.pay)}</td><td class="right num">${usd(A.bk)}</td><td class="right num">${usd(A.oth)}</td><td class="right num">${usd(A.tot)}</td><td></td><td></td><td class="right num fcol20">${usd(A.form)}<span class="cnt2">${A.nForm} cty</span></td></tr></tbody></table>
+    <tr class="tot"><td>All years</td><td class="right num">${usd(A.pay)}</td><td class="right num">${usd(A.bk)}</td><td class="right num">${usd(A.oth)}</td><td class="right num">${usd(A.tot)}</td><td class="right num op21i">${A.open ? usd(A.open) : ''}</td><td></td><td></td><td class="right num fcol20">${usd(A.form)}<span class="cnt2">${A.nForm} cty</span></td></tr></tbody></table>
     <h2 class="bd-h" style="margin-top:34px">${CYS} by month</h2>${barsHtml(monthTotals(CYS))}`;
 }
 function barsHtml({ pay, oth }) {
