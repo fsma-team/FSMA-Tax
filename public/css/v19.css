@@ -345,24 +345,38 @@ body:not([data-style=simple]) .page-head h1{color:var(--cloud-ink)}
 .recf19 .sep{width:1px;height:20px;background:var(--line);margin:0 6px}
 .recf19 .btn.on{background:var(--cloud-fill);border-color:var(--cloud-line);color:var(--cloud-ink);font-weight:600}
 .recf19on{flex-basis:100%;font-size:12.5px;color:var(--ink);background:var(--yellow);border:1px solid var(--yline);border-radius:8px;padding:3px 10px;margin-top:4px}
-.rd19 th a{color:inherit;text-decoration:none}.rd19 th a:hover{color:var(--link)}
-.rd19 tr.tot td{font-weight:700;border-top:1px solid var(--line)}
-.rd19 th small{display:block;font-weight:400;color:var(--muted);font-size:11px}
 .rdbar19{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:12px;font-size:13.5px}
 .rdbar19 .seg19{display:inline-flex;gap:4px}
 .rdbar19 .btn.on{background:var(--cloud-fill);border-color:var(--cloud-line);color:var(--cloud-ink);font-weight:600}
 .rdbar19 .chk{display:inline-flex;gap:5px;align-items:center;cursor:pointer}
 
-/* Theo ngày: bảng gọn, mỗi ô 1 dòng: thứ · số · income, thanh nền theo số */
-.rd19{width:auto;max-width:100%;border-collapse:collapse}
-.rd19 th,.rd19 td{padding:3px 8px}
-.rd19 th:first-child,.rd19 td:first-child{width:56px;white-space:nowrap}
-.rd19 td.n{position:relative;width:190px;min-width:150px;white-space:nowrap}
-.rd19 .rdb{position:absolute;left:4px;top:4px;bottom:4px;max-width:calc(100% - 8px);background:var(--cloud-fill);border-radius:4px}
-.rd19 .rdl{position:relative;display:flex;align-items:baseline;gap:8px;justify-content:flex-end}
-.rd19 .rdl b{font-variant-numeric:tabular-nums;min-width:28px;text-align:right}
-.rd19 .rdl .ex{color:var(--muted);font-size:12.5px;font-variant-numeric:tabular-nums;min-width:58px;text-align:right}
-.rd19 .rdl .wd{font-style:normal;font-size:11px;color:var(--faint);margin-right:auto}
-.rd19 td.we .wd{color:var(--orange-ink);font-weight:600}
-.rd19 td.av{background:var(--soft);width:140px}
-.rd19 tr.tot td{font-weight:700;border-top:1px solid var(--line)}
+/* Theo ngày: mỗi preparer 1 cột → Tổng ngày; nền trắng, không thanh màu */
+.rdbar19{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:6px;font-size:13.5px}
+.rdbar19 .lbl{font-weight:600}
+.rdbar19 .btn.on{background:var(--cloud-fill);border-color:var(--cloud-line);color:var(--cloud-ink);font-weight:600}
+.rdbar19 .sep{width:1px;height:18px;background:var(--line);margin:0 4px}
+.rdbar19 .chk{display:inline-flex;gap:5px;align-items:center;cursor:pointer}
+h3.rdh19{font-size:16px;margin:18px 0 6px}h3.rdh19 small{font-weight:400;color:var(--muted);font-size:12.5px;margin-left:6px}
+.rd19{border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:13px;width:auto;background:#fff}
+.rd19 th,.rd19 td{padding:3px 8px;white-space:nowrap;background:#fff}
+.rd19 thead th{font-weight:600;font-size:12px;color:var(--muted);text-align:right;border-bottom:1px solid var(--line)}
+.rd19 thead tr.top th{color:var(--ink);font-size:13px;text-align:center;border-bottom:0;padding-bottom:0}
+.rd19 thead tr.top th small{color:var(--faint);font-weight:400;font-size:11px}
+.rd19 th.d,.rd19 td.d{text-align:left}
+.rd19 .g{border-left:1px solid var(--line)}
+.rd19 .G{border-left:2px solid #c9d6e3}
+.rd19 th a{color:inherit;text-decoration:none}.rd19 th a:hover{color:var(--link)}
+.rd19 tbody td{border-bottom:1px solid var(--line2);text-align:right;color:var(--ink)}
+.rd19 tbody tr:hover td{background:#f7fafd}
+.rd19 td.d{font-weight:600}
+.rd19 td.w{color:var(--faint);font-size:12px;text-align:left}
+.rd19 td.w.we{color:#c2410c;font-weight:600}
+.rd19 td.x{color:#d0d6dc}
+.rd19 td.i{color:#4a5663}
+.rd19 td.tc{font-weight:700}.rd19 td.ti{font-weight:600}
+.rd19 td.tot{background:#f6f9fc}
+.rd19 td.top{color:#2a6aa6}.rd19 td.top::after{content:" ●";font-size:8px;vertical-align:2px}
+.rd19 tfoot td{font-weight:700;border-top:2px solid var(--line);text-align:right;padding-top:5px}
+.rd19 tfoot tr.pct td{font-weight:400;color:var(--muted);font-size:12px;padding-top:0}
+/* hình trang trí theme chỉ ở Homepage */
+body.nodecor19 #decor19{display:none}

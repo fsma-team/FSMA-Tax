@@ -232,7 +232,7 @@ function fh19(title,right){return '<div class="fh19"><h2 class="fhh">'+title+'</
 
 /* ================= theme applies on every render ================= */
 var _render18=render;
-render=function(){if(S.me)V19.applyTheme();_render18()};
+render=function(){if(S.me)V19.applyTheme();document.body.classList.toggle("nodecor19",S.page!=="home");_render18()};
 
 /* ================= home data (comes with /boot; refreshed with the 30 s rows poll while Home is open) ================= */
 S.home=null;
@@ -474,35 +474,70 @@ function recFilterBar19(){var on=S.recFrom||S.recTo,Q=[["01-20","01-31","Cuối 
     '<span class="sep"></span>'+Q.map(function(q){return '<button class="btn sm'+(S.recFrom===q[0]&&S.recTo===q[1]?' on':'')+'" data-rq="'+q[0]+'|'+q[1]+'">'+q[2]+'</button>'}).join(" ")+
     (on?' <button class="btn sm" id="rfClear">Bỏ lọc</button><div class="recf19on">Đang lọc: <b>'+(mdTxt19(S.recFrom)||"đầu mùa")+' – '+(mdTxt19(S.recTo)||"cuối mùa")+'</b> của mỗi năm nộp (VD năm 2025 = ngày trong 2026). Áp dụng cho Summary, Report, Preparers, Theo ngày, Clients.</div>':'')+'</div>'}
 S.rdM="both";S.rdNoPeter=true;S.rdNow=true;
+/* Theo ngày: mỗi năm 1 bảng (cột từng preparer → Tổng ngày); nhiều năm thì thêm bảng So sánh các năm ở trên */
+function rdData19(ys){
+  var NOW=S.season,noP=function(p){return S.rdNoPeter&&/^peter/i.test(p||"")},D={},PR={},yl=ys.slice();
+  var inR=function(k){if(!S.recFrom&&!S.recTo)return true;var a=S.recFrom||"01-01",b=S.recTo||"12-31";return a<=b?(k>=a&&k<=b):(k>=a||k<=b)};
+  var add=function(y,d,p,c,v){if(noP(p)||+d.slice(0,4)!==y+1)return;var k=d.slice(5);if(!inR(k))return;
+    D[y]=D[y]||{};var o=D[y][k]=D[y][k]||{c:0,i:0,p:{}};o.c+=c;o.i+=v;var q=o.p[p]=o.p[p]||{c:0,i:0};q.c+=c;q.i+=v};
+  ys.forEach(function(y){recRows(y).forEach(function(r){add(y,r.d,r.p,r.a[0],inc(r.a))})});
+  if(S.rdNow&&ys.indexOf(NOW)<0){allRows().forEach(function(x){var r=x.r;if(!r.date)return;add(NOW,r.date,x.s.name,(r.status!=="Refund"&&r.name)?1:0,amt(r))});if(D[NOW])yl.push(NOW)}
+  /* thứ tự preparer: income cả mùa (không lọc ngày) */
+  yl.forEach(function(y){PR[y]={};if(y===NOW&&ys.indexOf(NOW)<0)allRows().forEach(function(x){PR[y][x.s.name]=(PR[y][x.s.name]||0)+amt(x.r)});else _recRows18(y).forEach(function(r){PR[y][r.p]=(PR[y][r.p]||0)+inc(r.a)})});
+  return {D:D,PR:PR,ys:yl.filter(function(y){return D[y]}),NOW:NOW,cur:ys.indexOf(NOW)<0};
+}
+function rdAr19(k){return S.rdSort===k?(S.rdDir>0?" ▲":" ▼"):""}
+function rdSort19(K,val){return K.sort(function(a,b){var x=val(a),z=val(b);return (x<z?-1:x>z?1:0)*S.rdDir})}
+function rdTop19(K,get){var v=K.map(get).filter(function(x){return x>0}).sort(function(a,b){return b-a});return v.length?v[Math.min(2,v.length-1)]:Infinity}
+var WD19=["CN","T2","T3","T4","T5","T6","T7"];
+function rdWd19(y,k){var w=new Date((y+1)+"-"+k+"T12:00:00Z").getUTCDay();return '<td class="w'+(w===0||w===6?' we':'')+'">'+WD19[w]+'</td>'}
+function rdYear19(R,y){
+  var showC=S.rdM!=="inc",showI=S.rdM!=="c",sub=(showC?1:0)+(showI?1:0),Y=R.D[y],mny=function(n){return money(Math.round(n))};
+  var K=Object.keys(Y),P=Object.keys(R.PR[y]).filter(function(p){return K.some(function(k){return Y[k].p[p]})}).sort(function(a,b){return R.PR[y][b]-R.PR[y][a]});
+  rdSort19(K,function(k){if(S.rdSort==="date")return k;var p=S.rdSort.split("|");if(p[0]==="tot")return Y[k][p[1]];if(p[0]!==String(y))return k;var o=Y[k].p[p[1]];return o?o[p[2]]:-1});
+  var tc=rdTop19(K,function(k){return Y[k].c}),ti=rdTop19(K,function(k){return Y[k].i}),cI=showC?'':' g',cT=showC?'':' G';
+  var h='<div class="wrap"><table class="rd19"><thead><tr class="top"><th class="d"></th><th></th>'+P.map(function(p){return '<th class="g" colspan="'+sub+'">'+esc(p)+'</th>'}).join("")+'<th class="G" colspan="'+sub+'">Tổng ngày</th></tr>';
+  h+='<tr><th class="d"><a href="#" data-rds="date">Ngày'+rdAr19("date")+'</a></th><th class="d">Thứ</th>';
+  P.forEach(function(p){var b=y+"|"+p+"|";if(showC)h+='<th class="g"><a href="#" data-rds="'+esc(b)+'c">Khách'+rdAr19(b+"c")+'</a></th>';if(showI)h+='<th class="'+cI+'"><a href="#" data-rds="'+esc(b)+'i">$'+rdAr19(b+"i")+'</a></th>'});
+  if(showC)h+='<th class="G"><a href="#" data-rds="tot|c">Khách'+rdAr19("tot|c")+'</a></th>';if(showI)h+='<th class="'+cT+'"><a href="#" data-rds="tot|i">Income'+rdAr19("tot|i")+'</a></th>';
+  h+='</tr></thead><tbody>';
+  var sum={},T={c:0,i:0};P.forEach(function(p){sum[p]={c:0,i:0}});
+  K.forEach(function(k){var o=Y[k];T.c+=o.c;T.i+=o.i;h+='<tr><td class="d">'+mdTxt19(k)+'</td>'+rdWd19(y,k);
+    P.forEach(function(p){var q=o.p[p];if(q){sum[p].c+=q.c;sum[p].i+=q.i}
+      if(showC)h+=q?'<td class="g">'+q.c+'</td>':'<td class="g x">–</td>';
+      if(showI)h+=q?'<td class="i'+cI+'">'+mny(q.i)+'</td>':'<td class="x'+cI+'">–</td>'});
+    if(showC)h+='<td class="G tot tc'+(o.c>=tc?' top':'')+'">'+o.c+'</td>';if(showI)h+='<td class="tot ti'+cT+(o.i>=ti?' top':'')+'">'+mny(o.i)+'</td>';
+    h+='</tr>'});
+  h+='</tbody><tfoot><tr><td class="d">Tổng</td><td></td>';
+  P.forEach(function(p){if(showC)h+='<td class="g">'+sum[p].c+'</td>';if(showI)h+='<td class="'+cI+'">'+mny(sum[p].i)+'</td>'});
+  if(showC)h+='<td class="G">'+T.c.toLocaleString()+'</td>';if(showI)h+='<td class="'+cT+'">'+mny(T.i)+'</td>';
+  h+='</tr><tr class="pct"><td class="d">% tổng</td><td></td>';
+  P.forEach(function(p){if(showC)h+='<td class="g">'+(T.c?Math.round(sum[p].c/T.c*100):0)+'%</td>';if(showI)h+='<td class="'+cI+'">'+(T.i?Math.round(sum[p].i/T.i*100):0)+'%</td>'});
+  if(showC)h+='<td class="G">'+(K.length?(T.c/K.length).toFixed(1):0)+'/ngày</td>';if(showI)h+='<td class="'+cT+'">'+mny(K.length?T.i/K.length:0)+'/ngày</td>';
+  return h+'</tr></tfoot></table></div>';
+}
+function rdCompare19(R){
+  var ys=R.ys.slice().sort(),showC=S.rdM!=="inc",showI=S.rdM!=="c",sub=(showC?1:0)+(showI?1:0),keys={},mny=function(n){return money(Math.round(n))};
+  ys.forEach(function(y){Object.keys(R.D[y]).forEach(function(k){keys[k]=1})});
+  var K=Object.keys(keys),avg=function(k,f){var s=0,n=0;ys.forEach(function(y){var o=R.D[y][k];if(o){s+=o[f];n++}});return n?s/n:0};
+  rdSort19(K,function(k){if(S.rdSort==="date")return k;var p=S.rdSort.split("|");if(p[0]==="avg")return avg(k,p[1]);if(p[0]==="cmp")return ((R.D[p[1]]||{})[k]||{c:-1,i:-1})[p[2]];return k});
+  var h='<div class="wrap"><table class="rd19"><thead><tr class="top"><th class="d"></th>'+ys.map(function(y){return '<th class="g" colspan="'+(sub+1)+'">'+y+' <small>'+(y===R.NOW&&R.cur?'mùa này · ':'')+'nộp '+(y+1)+'</small></th>'}).join("")+'<th class="G" colspan="'+sub+'">Trung bình</th></tr><tr><th class="d"><a href="#" data-rds="date">Ngày'+rdAr19("date")+'</a></th>';
+  ys.forEach(function(y){h+='<th class="g d">Thứ</th>'+(showC?'<th><a href="#" data-rds="cmp|'+y+'|c">Khách'+rdAr19("cmp|"+y+"|c")+'</a></th>':'')+(showI?'<th><a href="#" data-rds="cmp|'+y+'|i">Income'+rdAr19("cmp|"+y+"|i")+'</a></th>':'')});
+  h+=(showC?'<th class="G"><a href="#" data-rds="avg|c">Khách'+rdAr19("avg|c")+'</a></th>':'')+(showI?'<th class="'+(showC?'':'G')+'"><a href="#" data-rds="avg|i">Income'+rdAr19("avg|i")+'</a></th>':'')+'</tr></thead><tbody>';
+  K.forEach(function(k){h+='<tr><td class="d">'+mdTxt19(k)+'</td>';ys.forEach(function(y){var o=R.D[y][k];
+    h+=rdWd19(y,k).replace('class="w','class="g w')+(showC?(o?'<td class="tc">'+o.c+'</td>':'<td class="x">–</td>'):'')+(showI?(o?'<td class="i">'+mny(o.i)+'</td>':'<td class="x">–</td>'):'')});
+    h+=(showC?'<td class="G tot tc">'+avg(k,"c").toFixed(1)+'</td>':'')+(showI?'<td class="tot ti'+(showC?'':' G')+'">'+mny(avg(k,"i"))+'</td>':'')+'</tr>'});
+  return h+'</tbody></table></div>';
+}
 function recDaily19(ys){
-  var asc=ys.slice().sort(),names={},Y={},keys={},WD=["CN","T2","T3","T4","T5","T6","T7"],cols=asc.slice(),NOW=S.season,noP=function(p){return S.rdNoPeter&&/^peter/i.test(p||"")};
-  var add=function(y,d,p,c,v){names[p]=1;if(noP(p)||(S.rdP&&p!==S.rdP))return;if(+d.slice(0,4)!==y+1)return;var k=d.slice(5);
-    if(S.recFrom||S.recTo){var a=S.recFrom||"01-01",b=S.recTo||"12-31";if(a<=b?(k<a||k>b):(k<a&&k>b))return}
-    var o=Y[y][k]=Y[y][k]||{c:0,inc:0};o.c+=c;o.inc+=v;keys[k]=1};
-  asc.forEach(function(y){Y[y]={};recRows(y).forEach(function(r){add(y,r.d,r.p,r.a[0],inc(r.a))})});
-  if(S.rdNow&&asc.indexOf(NOW)<0){Y[NOW]={};allRows().forEach(function(x){var r=x.r;if(!r.date)return;add(NOW,r.date,x.s.name,(r.status!=="Refund"&&r.name)?1:0,amt(r))});if(Object.keys(Y[NOW]).length)cols.push(NOW);else delete Y[NOW]}
-  var M=S.rdM==="inc"?"inc":"c",K=Object.keys(keys);
-  var avg=function(k,f){var s=0,n=0;cols.forEach(function(y){var o=Y[y][k];if(o){s+=o[f];n++}});return n?s/n:0};
-  var val=function(k){return S.rdSort==="date"?k:S.rdSort==="avg"?avg(k,M):((Y[S.rdSort]||{})[k]||{c:-1,inc:-1})[M]};
-  K.sort(function(a,b){var x=val(a),z=val(b);return (x<z?-1:x>z?1:0)*S.rdDir});
-  var arrow=function(k){return S.rdSort===String(k)?(S.rdDir>0?' ▲':' ▼'):''},mny=function(n){return money(Math.round(n))};
-  var h='<div class="rdbar19"><span class="seg19">'+[["both","Khách + Income"],["c","Khách"],["inc","Income"]].map(function(x){return '<button class="btn sm'+(S.rdM===x[0]?' on':'')+'" data-rdm="'+x[0]+'">'+x[1]+'</button>'}).join("")+'</span>'+
-    '<label class="chk"><input type="checkbox" id="rdNoP"'+(S.rdNoPeter?' checked':'')+'> Không tính Peter</label>'+
-    '<label class="chk"><input type="checkbox" id="rdNow"'+(S.rdNow?' checked':'')+'> Thêm mùa này ('+NOW+')</label>'+
-    '<span class="muted">Preparer</span> <select id="rdP"><option value="">Tất cả</option>'+Object.keys(names).sort().filter(function(n){return !noP(n)}).map(function(n){return '<option'+(n===S.rdP?' selected':'')+'>'+esc(n)+'</option>'}).join("")+'</select>'+
-    '<span class="muted small">Bấm tiêu đề cột để sắp xếp</span></div>';
-  var tot={},days={};cols.forEach(function(y){tot[y]={c:0,inc:0};days[y]=0;Object.keys(Y[y]).forEach(function(k){tot[y].c+=Y[y][k].c;tot[y].inc+=Y[y][k].inc;days[y]++})});
-  h+='<div class="statbar" style="margin-bottom:16px">'+cols.map(function(y){var d=days[y]||1;return '<div class="c"><b>'+(M==="inc"?mny(tot[y].inc):tot[y].c)+'</b><span>'+(y===NOW&&asc.indexOf(NOW)<0?'Mùa này ':'')+y+' · '+days[y]+' ngày · TB '+(M==="inc"?mny(tot[y].inc/d):(tot[y].c/d).toFixed(1))+'/ngày'+(S.rdM==="both"?' · '+mny(tot[y].inc):'')+'</span></div>'}).join("")+'</div>';
-  if(!K.length)return h+'<div class="muted">Không có ngày nào trong khoảng này.</div>';
-  var mx=1;K.forEach(function(k){cols.forEach(function(y){var o=Y[y][k];if(o&&o[M]>mx)mx=o[M]})});
-  var cell=function(o,w){var wd='<i class="wd">'+WD[w]+'</i>';if(!o)return '<span class="rdl">'+wd+'<span class="muted">–</span></span>';
-    var main=M==="inc"?'<b>'+mny(o.inc)+'</b>':'<b>'+o.c+'</b>',ex=S.rdM==="both"?'<span class="ex">'+mny(o.inc)+'</span>':S.rdM==="inc"?'<span class="ex">'+o.c+' kh</span>':'';
-    return '<span class="rdb" style="width:'+Math.max(2,Math.round(o[M]/mx*100))+'%"></span><span class="rdl">'+wd+main+ex+'</span>'};
-  h+='<div class="wrap"><table class="t2 rd19"><tr><th><a href="#" data-rds="date">Ngày'+arrow("date")+'</a></th>'+cols.map(function(y){return '<th class="n"><a href="#" data-rds="'+y+'">'+y+arrow(y)+'</a><small>'+(y===NOW&&asc.indexOf(NOW)<0?'mùa này · ':'')+'nộp '+(y+1)+'</small></th>'}).join("")+(cols.length>1?'<th class="n"><a href="#" data-rds="avg">Trung bình'+arrow("avg")+'</a>'+(S.rdM==="both"?'<small>khách · income</small>':'')+'</th>':'')+'</tr>'+
-    K.map(function(k){return '<tr><td><b>'+mdTxt19(k)+'</b></td>'+cols.map(function(y){var w=new Date((y+1)+"-"+k+"T12:00:00Z").getUTCDay();return '<td class="n'+(w===0||w===6?' we':'')+'">'+cell(Y[y][k],w)+'</td>'}).join("")+
-      (cols.length>1?'<td class="n av"><span class="rdl"><b>'+(M==="inc"?mny(avg(k,"inc")):avg(k,"c").toFixed(1))+'</b>'+(S.rdM==="both"?'<span class="ex">'+mny(avg(k,"inc"))+'</span>':'')+'</span></td>':'')+'</tr>'}).join("")+
-    '<tr class="tot"><td>Tổng</td>'+cols.map(function(y){return '<td class="n"><span class="rdl"><b>'+(M==="inc"?mny(tot[y].inc):tot[y].c)+'</b>'+(S.rdM==="both"?'<span class="ex">'+mny(tot[y].inc)+'</span>':'')+'</span></td>'}).join("")+(cols.length>1?'<td></td>':'')+'</tr></table></div>';
-  h+='<div class="muted small" style="margin-top:6px">Income = tổng tiền các preparer trong ngày (Refund trừ ra, không tính Tips)'+(S.rdNoPeter?' · không tính Peter':'')+' · Mùa này lấy từ các tab nhân viên.</div>';
+  var R=rdData19(ys),h='<div class="rdbar19"><span class="lbl">Xem</span>'+[["both","Khách + Income"],["c","Khách"],["inc","Income"]].map(function(x){return '<button class="btn sm'+(S.rdM===x[0]?' on':'')+'" data-rdm="'+x[0]+'">'+x[1]+'</button>'}).join("")+
+    '<span class="sep"></span><label class="chk"><input type="checkbox" id="rdNoP"'+(S.rdNoPeter?' checked':'')+'> Không tính Peter</label>'+
+    '<label class="chk"><input type="checkbox" id="rdNow"'+(S.rdNow?' checked':'')+'> Thêm mùa này ('+R.NOW+')</label><span class="muted small">Bấm tiêu đề cột để sắp xếp</span></div>';
+  if(!R.ys.length)return h+'<div class="muted">Không có ngày nào trong khoảng này.</div>';
+  var order=R.ys.slice().sort(function(a,b){return b-a});
+  if(R.ys.length>1)h+='<h3 class="rdh19">So sánh các năm <small>chỉ Tổng ngày</small></h3>'+rdCompare19(R);
+  order.forEach(function(y){h+='<h3 class="rdh19">'+y+' <small>'+(y===R.NOW&&R.cur?'mùa này · ':'')+'nộp '+(y+1)+' · theo preparer</small></h3>'+rdYear19(R,y)});
+  h+='<div class="muted small" style="margin-top:6px">● = 3 ngày đông nhất / income cao nhất (cột Tổng ngày) · Thứ 7 / CN màu cam · – = không có hồ sơ · Income = tổng tiền trong ngày, đã trừ Refund, không tính Tips'+(S.rdNoPeter?' · không tính Peter':'')+'.</div>';
   return h;
 }
 pageRecords=function(){
@@ -510,7 +545,7 @@ pageRecords=function(){
   h+='<div class="page-head"><div><h1>Records</h1><div class="sub">Các mùa thuế cũ · chỉ Admin thấy</div></div></div>';
   h+='<div class="rec-bar"><div><span class="lbl">Năm</span>'+REC_YEARS.map(function(y){return '<button class="btn'+(ys.length===1&&ys[0]===y?' on':'')+'" data-ry="'+y+'">'+y+'</button> '}).join("")+'<button class="btn'+(ys.length>1?' on':'')+'" id="ryAll">Chọn hết</button></div></div>';
   h+=recFilterBar19();
-  h+='<div class="sub-tabs">'+[["summary","Summary"],["report","Report"],["prep","Preparers"],["daily","Theo ngày (khách · income)"],["clients","Clients"]].map(function(x){return '<button class="btn'+(S.recSub===x[0]?' on':'')+'" data-rs="'+x[0]+'">'+x[1]+'</button>'}).join("")+'<span class="muted small" style="margin-left:10px">'+(ys.length>1?'Tất cả '+ys.slice().sort().join(", "):ys[0]+' · nộp trong '+(ys[0]+1))+'</span></div>';
+  h+='<div class="sub-tabs">'+[["summary","Summary"],["report","Report"],["prep","Preparers"],["daily","Theo ngày"],["clients","Clients"]].map(function(x){return '<button class="btn'+(S.recSub===x[0]?' on':'')+'" data-rs="'+x[0]+'">'+x[1]+'</button>'}).join("")+'<span class="muted small" style="margin-left:10px">'+(ys.length>1?'Tất cả '+ys.slice().sort().join(", "):ys[0]+' · nộp trong '+(ys[0]+1))+'</span></div>';
   h+=S.recSub==="summary"?recSummary(ys):S.recSub==="report"?recReport(ys):S.recSub==="prep"?recPrep(ys):S.recSub==="daily"?recDaily19(ys):recClients(ys);
   h+='<div class="muted small" style="margin-top:6px">Năm 2025 = khai thuế năm 2025, nộp trong 2026 (tương tự các năm khác) · Records chỉ có số tổng theo ngày và preparer · Năm nào tab không ghi Status thì EF, Accepted, Others hiện –.</div>';
   return h;
@@ -540,7 +575,7 @@ bindRecords=function(){
   $$("[data-rdm]").forEach(function(b){b.onclick=function(){S.rdM=b.getAttribute("data-rdm");render()}});
   if($("#rdNoP"))$("#rdNoP").onchange=function(){S.rdNoPeter=this.checked;render()};
   if($("#rdNow"))$("#rdNow").onchange=function(){S.rdNow=this.checked;render()};
-  $$("[data-rds]").forEach(function(a){a.onclick=function(e){e.preventDefault();var k=a.getAttribute("data-rds");if(S.rdSort===k)S.rdDir=-S.rdDir;else{S.rdSort=k;S.rdDir=k==="date"?1:-1}render()}});
+  $$("[data-rds]").forEach(function(a){a.onclick=function(e){e.preventDefault();var k=a.getAttribute("data-rds");if(S.rdSort===k)S.rdDir=-S.rdDir;else{S.rdSort=k;S.rdDir=k==="date"?1:-1}var y=window.scrollY;render();window.scrollTo(0,y)}});
 };
 
 /* ================= go ================= */

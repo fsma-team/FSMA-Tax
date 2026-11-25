@@ -4,6 +4,9 @@ import {
   db, json, HttpError, requireUser, requireAdmin, createSession, cookieHeader, env,
   s, isoDate, num, bool, nameKey, todayLA, hhmm, toMin,
 } from '../lib/core.mjs';
+import * as PR from '../lib/pr.mjs';
+import { getNews, pullFeed } from '../lib/news.mjs';
+import { SCHEMA_V20 } from '../lib/schema20.mjs';
 import { smsCfg, checkSms, fill, fmtDay, fmtDayLong, fmtHour, linkOf, linkData, newBookToken, laNow, inSeason, queueSms, sendOne, sendAtFor, shortName, siteUrl } from '../lib/sms.mjs';
 
 const STATUS = ['', 'E-file', 'Accepted', 'Rejected', 'Hold', 'Paper Mailed', 'Refund'];
@@ -11,7 +14,8 @@ const METHODS = ['Cash', 'Check', 'Zelle', 'Venmo'];
 const COLORS = ['Rose', 'Blue', 'Sunshine', 'Green', 'Orange', 'Purple', 'Teal', 'Pink'];
 const FONTS = ['Pacifico', 'Lobster', 'Comfortaa', 'Montserrat', 'Nunito', 'Oswald', 'Gloria Hallelujah', 'Quicksand'];
 const APPT_FONTS = ['Default', 'Nunito', 'Quicksand', 'Montserrat', 'Comfortaa'];
-const THEMES = ['simple', 'genz', 'pro', 'autumn', 'rain', 'amazon', 'hawaii', 'snack', 'chill', 'city'];
+const THEMES = ['autumn', 'cruise', 'bloom', 'pro']; // v20: 4 themes
+const TAB_STYLES = ['pill', 'icon', 'bub', 'face', 'tag', 'dot'];
 const FOODS = ['boba', 'trabb', 'che', 'cavien', 'bovien', 'bttron', 'btcuon', 'bunbo', 'sbux', 'matcha', 'bacxiu'];
 const ZODIACS = ['aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo', 'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces'];
 const MOODS = ['😎', '☕', '🥱', '🤯', '🥳'];
@@ -159,6 +163,11 @@ function ensureSchema() {
     const ok19 = ['theme', 'food', 'zodiac'].every((c) => has('users', c)) && has('bookings', 'biz')
       && ['home_notes', 'home_votes'].every((t) => tabs.some((r) => r.table_name === t));
     if (!ok19) { console.log('schema: adding v19 columns'); await sql.unsafe(SCHEMA_V19); }
+    const c20 = await sql`select table_name, column_name from information_schema.columns
+      where table_schema = current_schema() and ((table_name='users' and column_name='tab_styles') or (table_name='pay_rows' and column_name='wages_manual') or (table_name in ('pr_audit','news_feeds') and column_name='id' or column_name='feed'))`;
+    const t20 = await sql`select table_name from information_schema.tables where table_schema = current_schema() and table_name in ('pr_businesses','pr_audit','news_items','news_feeds')`;
+    const ok20 = c20.some((r) => r.table_name === 'users') && c20.some((r) => r.table_name === 'pay_rows') && t20.length === 4;
+    if (!ok20) { console.log('schema: adding v20 tables'); await sql.unsafe(SCHEMA_V20); }
   })().catch((e) => { console.error('schema', e); _schema = null; });
   return _schema;
 }
@@ -211,7 +220,7 @@ async function health() {
   return json(out);
 }
 
-const meOut = (u) => ({ id: u.id, username: u.username, full_name: u.full_name, display_name: u.display_name, role: u.role, tab_id: u.tab_id, must_change: u.must_change, appt_font: u.appt_font, theme: u.theme || 'simple', food: u.food || '', zodiac: u.zodiac || '' });
+const meOut = (u) => ({ id: u.id, username: u.username, full_name: u.full_name, display_name: u.display_name, role: u.role, tab_id: u.tab_id, must_change: u.must_change, appt_font: u.appt_font, theme: THEMES.includes(u.theme) ? u.theme : 'autumn', food: u.food || '', zodiac: u.zodiac || '', tab_styles: u.tab_styles || {} });
 
 async function changePassword(user, body) {
   const sql = db();
@@ -261,6 +270,10 @@ function checkSetting(key, v) {
     return o;
   }
   if (key === 'sms') return checkSms(v);
+  if (key === 'pr_price') {
+    if (!Array.isArray(v) || v.length > 20) throw new HttpError(400, 'Bad price list');
+    return v.map((r) => [String(r?.[0] ?? '').slice(0, 20), num(r?.[1], { min: 0, max: 1e5 }), num(r?.[2], { min: 0, max: 1e5 }), num(r?.[3], { min: 0, max: 1e5 })]);
+  }
   if (key === 'lunch') {
     if (!Array.isArray(v) || v.length > 8) throw new HttpError(400, 'Bad list');
     return v.map((x) => String(x).trim().slice(0, 40)).filter(Boolean);
@@ -830,11 +843,12 @@ async function recordsClients(url) {
       ${q ? (/^\d{1,4}$/.test(q) ? (q.length === 4 ? sql`and ssn = ${q}` : sql`and ssn like ${q + '%'}`) : sql`and name_key like ${like}`) : sql``}
       ${md(url.searchParams.get('from')) ? sql`and day >= make_date(year + 1, ${md(url.searchParams.get('from'))[0]}, ${md(url.searchParams.get('from'))[1]})` : sql``}
       ${md(url.searchParams.get('to')) ? sql`and day <= make_date(year + 1, ${md(url.searchParams.get('to'))[0]}, ${md(url.searchParams.get('to'))[1]})` : sql``}`;
-  const asc = url.searchParams.get('sort') === 'asc';
+  const asc = url.searchParams.get('sort') === 'asc' || url.searchParams.get('dir') === 'asc';
+  const ord = { d: sql`day`, p: sql`preparer`, n: sql`name_key`, a: sql`amount`, s: sql`status` }[url.searchParams.get('order') || 'd'] || sql`day`;
   const [{ n }] = await sql`select count(*)::int as n from records_clients where ${where}`;
   const rows = asc
-    ? await sql`select year, day, preparer, name, ssn, amount, status, note from records_clients where ${where} order by year desc, day asc, id limit ${limit} offset ${offset}`
-    : await sql`select year, day, preparer, name, ssn, amount, status, note from records_clients where ${where} order by year desc, day desc, id limit ${limit} offset ${offset}`;
+    ? await sql`select year, day, preparer, name, ssn, amount, status, note from records_clients where ${where} order by year desc, ${ord} asc nulls last, day desc nulls last, id limit ${limit} offset ${offset}`
+    : await sql`select year, day, preparer, name, ssn, amount, status, note from records_clients where ${where} order by year desc, ${ord} desc nulls last, day desc nulls last, id limit ${limit} offset ${offset}`;
   return { total: n, rows: rows.map((r) => ({ year: r.year, date: r.day, preparer: r.preparer, name: r.name, ssn: r.ssn, amt: Number(r.amount), status: r.status, note: r.note })) };
 }
 
@@ -887,7 +901,7 @@ async function getAcct() {
     cash: cash.map((c) => ({ day: c.day, tab_id: c.tab_id, received: n2(c.received), done: c.done, note: c.note, by: c.updated_by, at: c.updated_at })),
     staff: staff.map(payStaffOut),
     periods: periods.map(periodOut),
-    rows: rows.map((r) => ({ period_id: r.period_id, staff_id: r.staff_id, hours: n2(r.hours), wages: n2(r.wages), bonus: n2(r.bonus), note: r.note })),
+    rows: rows.map((r) => ({ period_id: r.period_id, staff_id: r.staff_id, hours: n2(r.hours), wages: n2(r.wages), bonus: n2(r.bonus), note: r.note, wages_manual: !!r.wages_manual })),
   };
 }
 async function putCash(user, body) {
@@ -939,10 +953,10 @@ async function putPayRow(body) {
   const pid = Number(body.period_id), sid = Number(body.staff_id);
   if (!Number.isInteger(pid) || !Number.isInteger(sid)) throw new HttpError(400, 'Bad request');
   const hours = nnum(body.hours, { min: 0, max: 1000 }), wages = nnum(body.wages, { min: 0, max: 1e6 }), bonus = nnum(body.bonus, { min: 0, max: 1e6 });
-  const note = String(body.note ?? '').slice(0, 200);
-  const [r] = await db()`insert into pay_rows (period_id, staff_id, hours, wages, bonus, note) values (${pid}, ${sid}, ${hours}, ${wages}, ${bonus}, ${note})
-    on conflict (period_id, staff_id) do update set hours=excluded.hours, wages=excluded.wages, bonus=excluded.bonus, note=excluded.note returning *`;
-  return { period_id: r.period_id, staff_id: r.staff_id, hours: n2(r.hours), wages: n2(r.wages), bonus: n2(r.bonus), note: r.note };
+  const note = String(body.note ?? '').slice(0, 200); const manual = bool(body.wages_manual);
+  const [r] = await db()`insert into pay_rows (period_id, staff_id, hours, wages, bonus, note, wages_manual) values (${pid}, ${sid}, ${hours}, ${wages}, ${bonus}, ${note}, ${manual})
+    on conflict (period_id, staff_id) do update set hours=excluded.hours, wages=excluded.wages, bonus=excluded.bonus, note=excluded.note, wages_manual=excluded.wages_manual returning *`;
+  return { period_id: r.period_id, staff_id: r.staff_id, hours: n2(r.hours), wages: n2(r.wages), bonus: n2(r.bonus), note: r.note, wages_manual: !!r.wages_manual };
 }
 
 // ---------- backup (Admin) ----------
@@ -973,6 +987,12 @@ async function putPrefs(user, body) {
   if (body.theme !== undefined) {
     if (!THEMES.includes(body.theme)) throw new HttpError(400, 'Bad theme');
     await sql`update users set theme=${body.theme} where id=${user.id}`;
+  }
+  if (body.tab_styles !== undefined) {
+    const o = {};
+    if (!body.tab_styles || typeof body.tab_styles !== 'object') throw new HttpError(400, 'Bad tab style');
+    for (const k of THEMES) if (body.tab_styles[k] !== undefined) { if (!TAB_STYLES.includes(body.tab_styles[k])) throw new HttpError(400, 'Bad tab style'); o[k] = body.tab_styles[k]; }
+    await sql`update users set tab_styles=${sql.json(o)} where id=${user.id}`;
   }
   if (body.food !== undefined) {
     if (body.food !== '' && !FOODS.includes(body.food)) throw new HttpError(400, 'Bad food');
@@ -1170,6 +1190,29 @@ const routes = [
   ['DELETE', '/pay/periods/:id', async (x) => { requireAdmin(x.user); await db()`delete from pay_periods where id=${Number(x.id)}`; return { ok: true }; }],
   ['PUT', '/pay/rows', async (x) => { requireAdmin(x.user); return putPayRow(x.body); }],
   ['GET', '/log', async (x) => { requireAdmin(x.user); return listLog(); }],
+  // v20: news (everyone reads, Admin pulls / hides)
+  ['GET', '/news', (x) => getNews(x.url.searchParams.get('feed') === 'payroll' ? 'payroll' : 'tax', x.user.role === 'admin' && x.url.searchParams.get('all') === '1')],
+  ['POST', '/news/pull', async (x) => { requireAdmin(x.user); const f = x.body.feed === 'payroll' ? 'payroll' : 'tax'; return pullFeed(f); }],
+  ['PATCH', '/news/:id', async (x) => { requireAdmin(x.user); await db()`update news_items set hidden=${bool(x.body.hidden)} where id=${x.id}`; return { ok: true }; }],
+  // v20: Payroll & Service (Admin only)
+  ['GET', '/pr/data', async (x) => { requireAdmin(x.user); return PR.prData(); }],
+  ['POST', '/pr/biz', async (x) => { requireAdmin(x.user); return PR.createBiz(x.user, x.body); }],
+  ['PATCH', '/pr/biz/:id', async (x) => { requireAdmin(x.user); return PR.updateBiz(x.user, x.id, x.body); }],
+  ['DELETE', '/pr/biz/:id', async (x) => { requireAdmin(x.user); return PR.deleteBiz(x.user, x.id); }],
+  ['PUT', '/pr/tick', async (x) => { requireAdmin(x.user); return PR.putTick(x.user, x.body); }],
+  ['PUT', '/pr/pnote', async (x) => { requireAdmin(x.user); return PR.putPNote(x.user, x.body); }],
+  ['PUT', '/pr/fee', async (x) => { requireAdmin(x.user); return PR.putFee(x.user, x.body); }],
+  ['PUT', '/pr/fee/hl', async (x) => { requireAdmin(x.user); return PR.putFeeHl(x.user, x.body); }],
+  ['POST', '/pr/fee/line', async (x) => { requireAdmin(x.user); return PR.addFeeLine(x.user, x.body); }],
+  ['POST', '/pr/1099', async (x) => { requireAdmin(x.user); return PR.add1099(x.user, x.body); }],
+  ['POST', '/pr/1099/link', async (x) => { requireAdmin(x.user); return PR.link1099(x.user, x.body); }],
+  ['POST', '/pr/notes', async (x) => { requireAdmin(x.user); return PR.addNote(x.user, x.body); }],
+  ['DELETE', '/pr/notes/:id', async (x) => { requireAdmin(x.user); return PR.delNote(x.user, x.id); }],
+  ['PUT', '/pr/waive', async (x) => { requireAdmin(x.user); return PR.putWaive(x.user, x.body); }],
+  ['PUT', '/pr/templates', async (x) => { requireAdmin(x.user); return PR.putTemplates(x.user, x.body); }],
+  ['POST', '/pr/import', async (x) => { requireAdmin(x.user); return PR.importXlsx(x.user, x.body); }],
+  ['GET', '/pr/trash', async (x) => { requireAdmin(x.user); return PR.listTrash(); }],
+  ['POST', '/pr/trash/:id/restore', async (x) => { requireAdmin(x.user); return PR.restoreTrash(x.user, x.id); }],
   ['POST', '/log/:id/restore', async (x) => { requireAdmin(x.user); return restoreRow(x.user, x.id); }],
 ].map(([method, pattern, fn]) => {
   const keys = [];
