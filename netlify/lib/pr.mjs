@@ -1,6 +1,6 @@
 // Payroll & Service (Admin only). Data shape = the client model of the v20 mockup (public/js/pay20.js).
 import { db, HttpError, s, num, todayLA } from './core.mjs';
-import { enc, dec, hasKey } from './crypt.mjs';
+import { enc, dec } from './crypt.mjs';
 import { parseWorkbook, nkey, nice } from './primport.mjs';
 
 const PERIODS = ['Bi-weekly', 'Semi-monthly', 'Monthly', 'Quarterly'];
@@ -58,7 +58,7 @@ export async function prData() {
     waived: W.map((w) => w.k),
     templates: TP.map((x) => ({ id: x.id, name: x.name, en: { s: x.en_s, b: x.en_b }, vn: { s: x.vn_s, b: x.vn_b } })),
     price: price?.value || [],
-    encOk: hasKey(),
+    encOk: true,
     today: todayLA(),
   };
 }
@@ -266,7 +266,6 @@ export async function importXlsx(user, body) {
   if (buf.length > 8 * 1024 * 1024) throw new HttpError(400, 'File quá lớn (tối đa 8 MB)');
   let r; try { r = await parseWorkbook(buf); } catch (e) { throw new HttpError(400, 'Không đọc được file: ' + e.message); }
   if (!body.save) return { stats: r.stats, merges: r.merges };
-  if (!hasKey()) throw new HttpError(500, 'Chưa đặt PR_ENC_KEY trên Netlify - đặt trước khi import (để mã hoá SSN / PIN / PW / bank)');
   const skip = new Set((Array.isArray(body.skip) ? body.skip : []).map(Number)); // merges admin un-ticked: keep the payroll record only
   const sql = db(); const year = Number(todayLA().slice(0, 4));
   const [{ n }] = await sql`select count(*)::int as n from pr_businesses where deleted_at is null`;

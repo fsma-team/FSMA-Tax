@@ -1,6 +1,6 @@
-// AES-256-GCM for payroll secrets (owner SSN, EFTPS PIN, password, bank, owner DL).
-// Key: env PR_ENC_KEY = 32 random bytes in base64 (openssl rand -base64 32). Keep 2 copies outside Netlify/GitHub.
-// Stored format: "v1:" + base64(iv 12 | tag 16 | ciphertext)
+// Payroll secrets (owner SSN, EFTPS PIN, password, bank, owner DL).
+// v20.1: PR_ENC_KEY is OPTIONAL. Without it values are stored as plain text (that is how sql/11 loads them).
+// With it (32 random bytes base64), new values are stored "v1:" + base64(iv 12 | tag 16 | ciphertext) and both forms are read.
 import crypto from 'node:crypto';
 import { env, HttpError } from './core.mjs';
 
@@ -20,7 +20,7 @@ export function enc(plain) {
   const v = plain == null ? '' : String(plain).trim();
   if (!v) return null;
   const k = key();
-  if (!k) throw new HttpError(500, 'Chưa đặt PR_ENC_KEY trên Netlify (xem addendum-v20.md)');
+  if (!k) return v; // no key set: stored as plain text (database is private; only Admin API reads it)
   const iv = crypto.randomBytes(12);
   const c = crypto.createCipheriv('aes-256-gcm', k, iv);
   const body = Buffer.concat([c.update(v, 'utf8'), c.final()]);
@@ -29,8 +29,9 @@ export function enc(plain) {
 
 export function dec(stored) {
   if (!stored) return '';
+  if (!String(stored).startsWith('v1:')) return String(stored); // plain text
   const k = key();
-  if (!k) return '';
+  if (!k) return '(cần PR_ENC_KEY)';
   try {
     const b = Buffer.from(String(stored).replace(/^v1:/, ''), 'base64');
     const d = crypto.createDecipheriv('aes-256-gcm', k, b.subarray(0, 12));

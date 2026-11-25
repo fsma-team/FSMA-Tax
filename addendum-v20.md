@@ -4,35 +4,30 @@ Bản này làm đúng theo mockup v20.5 đã duyệt: 4 theme mới, tab **Payr
 
 ## 1. Cài đặt (làm 1 lần, theo thứ tự)
 
-### Bước 1 · Tạo khoá mã hoá `PR_ENC_KEY` (bắt buộc trước khi import)
-SSN, EFTPS PIN, password, số tài khoản ngân hàng và bằng lái được **mã hoá** trước khi lưu vào database (AES-256-GCM). Khoá này là khoá **mới**, không dùng chung `ENC_KEY` cũ.
+Không cần import Excel, không cần đặt khoá mã hoá.
 
-1. Tạo khoá: mở Terminal trên máy, chạy
-   `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`
-   (hoặc `openssl rand -base64 32`). Kết quả là 1 dòng 44 ký tự, kết thúc bằng `=`.
-2. Netlify › site **tax.fsma.team** › Site configuration › Environment variables › **Add a variable**: Key `PR_ENC_KEY`, Value = dòng vừa tạo. Scope: All.
-3. **Lưu khoá ở 2 nơi** (ví dụ: 1Password / Bitwarden + 1 bản in cất két). Mất khoá = mất toàn bộ SSN / PIN / PW / bank đã lưu (phải import lại từ Google Sheet). Không gửi khoá qua email / chat.
-4. Không bao giờ đổi khoá sau khi đã import. Muốn đổi: đặt khoá mới rồi import lại toàn bộ.
+### Bước 1 · Chạy 2 file SQL trong Supabase
+Supabase › SQL Editor › New query › dán nội dung file › **Run**:
 
-### Bước 2 · Chạy SQL
-Supabase › SQL Editor › dán nội dung `sql/10-v20.sql` › **Run**. Chạy lại lần 2 không sao. (Server cũng tự tạo bảng nếu thiếu, nhưng nên chạy tay.)
+1. `sql/10-v20.sql` (có trong zip): tạo bảng payroll, bảng tin, 3 email template mẫu, cột `users.tab_styles`, `pay_rows.wages_manual`, và **đổi theme của mọi người về Mùa thu** (7 theme cũ đã bỏ).
+2. `11-v20-payroll-data.sql` (file **gửi riêng**, không nằm trong zip): toàn bộ dữ liệu từ Google Sheet "Payroll Infos" – **208 business · 51 payroll active** (Bi-weekly 14 · Semi-monthly 6 · Monthly 10 · Quarterly 21) · 43 formations · 78 dòng 1099/Annual · tick báo cáo 2026 · 5 khoản nợ cũ đã waive sẵn.
+   File khoảng 120 KB, SQL Editor chạy được. Chạy lại lần 2 không sao: nếu đã có dữ liệu thì bỏ qua, không ghi đè.
 
-File này: thêm bảng payroll (`pr_*`), bảng tin (`news_items`, `news_feeds`), 3 email template mẫu, cột `users.tab_styles`, `pay_rows.wages_manual`, và **đổi theme của mọi người về Mùa thu** (7 theme cũ đã bỏ).
+**File 11 có đầy đủ SSN, EFTPS PIN, password, số tài khoản ngân hàng → chỉ dán vào Supabase, KHÔNG upload lên GitHub, chạy xong thì xoá file khỏi máy / email.**
 
-### Bước 3 · Upload code
-GitHub repo `FSMA-Tax`: thay toàn bộ bằng thư mục trong zip (kéo thả thư mục đã giải nén). Netlify tự build. Package mới: `exceljs` (đọc file .xlsx) – Netlify tự cài từ `package.json`.
+### Bước 2 · Upload code
+GitHub repo `FSMA-Tax`: thay toàn bộ bằng thư mục trong zip (kéo thả thư mục đã giải nén). Netlify tự build. Package mới: `exceljs` – Netlify tự cài từ `package.json`.
 
-### Bước 4 · Import Google Sheet "Payroll Infos"
-1. Google Sheet › File › Download › **Microsoft Excel (.xlsx)**.
-2. tax.fsma.team › **Payroll & Service** › Settings › **Import from Google Sheet** › chọn file › **Xem trước**.
-   Số đúng với file hiện tại: **208 business · 51 payroll active** (Bi-weekly 14 · Semi-monthly 6 · Monthly 10 · Quarterly 21) · 43 formations · 78 dòng 1099/Annual.
-3. Mục "cty gộp từ nhiều tab": bỏ tick nếu 2 tab bị gộp sai (giữ lại record payroll).
-4. **Lưu vào database**. Sau khi lưu, app tự **waive** các khoản nợ cũ (trước năm nay), giống mockup.
-5. Import lại lần sau = **thay toàn bộ** dữ liệu payroll (phải tick "Thay toàn bộ"). Ticks, fees, notes, 1099 nhập tay trên web sẽ mất → chỉ import lại khi thật cần.
-
-### Bước 5 · Tin tức
+### Bước 3 · Tin tức
 Tự chạy hàng ngày (function `news-cron`, khoảng 6–7 giờ sáng giờ California): tin Tax mỗi 3 ngày (2 IRS + 2 FTB), tin Payroll mỗi thứ Hai (3 tin: IRS, EDD, SSA, DIR).
 Lần đầu: Payroll & Service › Settings › **News** › bấm **Pull now** cho cả 2 dòng. Không dùng AI: chỉ lấy tiêu đề + 1 câu từ trang chính thức. Nguồn lỗi → giữ tin cũ và ghi lỗi ở dòng "Lần cuối". Bỏ tick "Hiện" để ẩn 1 tin.
+
+### Về bảo mật thông tin mật
+SSN / PIN / password / bank được lưu dạng chữ thường trong database Supabase (database riêng, chỉ server đọc được; trên web chỉ Admin xem được). Không cần biến `PR_ENC_KEY` nữa.
+Nếu sau này muốn mã hoá thêm: đặt `PR_ENC_KEY` trên Netlify (32 bytes base64) – các giá trị lưu **mới** sẽ được mã hoá, giá trị cũ vẫn đọc bình thường. Không bắt buộc.
+
+### (Không bắt buộc) Import lại từ Google Sheet
+Payroll & Service › Settings › **Import lại**: chỉ dùng khi muốn nạp lại toàn bộ từ file .xlsx – sẽ **thay toàn bộ** dữ liệu payroll (ticks, fees, notes nhập trên web sẽ mất).
 
 ## 2. Có gì mới
 
@@ -56,7 +51,7 @@ Lần đầu: Payroll & Service › Settings › **News** › bấm **Pull now**
 
 ## 3. Đã kiểm tra
 - PostgreSQL 16: chạy toàn bộ `sql/01…10` hai lần trên database mới – không lỗi.
-- Import `Payroll Infos.xlsx` qua giao diện → 208 business / 51 active, tự waive 5 khoản cũ (Due = $0), SSN / PIN / PW giải mã đúng.
+- Database mới: chạy `10` rồi `11` (2 lần) → 208 business / 51 active / 43 formations / 78 dòng 1099, Due = $0, Fees 2026 YTD $45,430. Chạy server **không có** `PR_ENC_KEY`: PIN / PW / SSN hiện đúng, sửa SSN lưu được.
 - Admin: tick, note, Prep email, sửa ô fee + highlight, thêm 1099, thêm / xoá note, sửa / tạo business, thêm Bookkeeping, price list, Trash, Search, Formations – lưu và tải lại đúng.
 - Preparer (Hari): menu chỉ có Homepage · Fees · Appointment · Attention · Tools; `/api/pr/*` trả 403.
 - 4 theme, chọn kiểu tab tên → lưu vào user. Lương: double-click sửa giờ / wages.
@@ -64,6 +59,5 @@ Lần đầu: Payroll & Service › Settings › **News** › bấm **Pull now**
 - **Chưa thử được**: lấy tin thật từ irs.gov / ftb.ca.gov / edd.ca.gov (máy test không vào được các trang này). Sau khi deploy, bấm **Pull now** để kiểm tra; nếu 1 nguồn báo lỗi, gửi lại dòng lỗi để chỉnh.
 
 ## 4. Lưu ý
-- File import tối đa khoảng 4 MB (giới hạn của Netlify Functions). File hiện tại nhỏ hơn nhiều.
 - Thông tin mật chỉ Admin xem được; vẫn nên giữ ít Admin.
 - Bỏ: 7 theme cũ, Reports › Nhân viên, biểu đồ fees theo tháng ở Home (vẫn còn ở Fees › Summary), dòng chú thích 1099 2024 (Annual fee giờ là 1 dòng riêng trong Fees).

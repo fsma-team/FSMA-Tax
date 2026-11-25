@@ -1,6 +1,6 @@
 # First Source Tax (tax.fsma.team)
 
-v20: xem `addendum-v20.md` (4 theme mới, tab **Payroll & Service** cho Admin, Tools, News tự cập nhật, Records/Accounting mới). Cần biến môi trường mới `PR_ENC_KEY` và chạy `sql/10-v20.sql`.
+v20: xem `addendum-v20.md` (4 theme mới, tab **Payroll & Service** cho Admin, Tools, News tự cập nhật, Records/Accounting mới). Chạy `sql/10-v20.sql` rồi file dữ liệu `11-v20-payroll-data.sql` (gửi riêng, không để trên GitHub).
 v18: xem `addendum-v18.md` (bỏ Chat, giao diện đám mây, Appt phone theo ngày, hình đại diện tab, Admin không bị khóa).
 v17: xem `addendum-v17.md` (Top producers, text cho khách, phone, Lock day).
 
@@ -24,6 +24,7 @@ Netlify (web + server) + Supabase (database) + GitHub (code), giống pb.fsma.te
 | 4d | `08-v18.sql` | v18: hình đại diện tab (không bắt buộc, server tự thêm) |
 | 4e | `09-v19.sql` | v19 (xem `addendum-v19.md`) |
 | 4f | `10-v20.sql` | v20: Payroll & Service, News, theme mới (xem `addendum-v20.md`) |
+| 4g | `11-v20-payroll-data.sql` | Dữ liệu payroll (file gửi riêng – có SSN/PIN/bank, **không** upload GitHub) |
 | 5 | `05-fees-update.sql` | Chỉ chạy khi đã chạy `02-seed.sql` từ bản cũ: thay toàn bộ bảng Fees bằng giá mới (sẽ ghi đè giá bạn đã sửa) |
 
    Các file `03-...` khá lớn (300–380 KB). Nếu SQL Editor báo quá lớn hoặc bị đứng, chạy từ máy tính bằng Node (xem mục "Chạy file SQL lớn" bên dưới).

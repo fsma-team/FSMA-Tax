@@ -579,7 +579,7 @@ let tplTimer = null;
 function saveTpl() { clearTimeout(tplTimer); tplTimer = setTimeout(() => { api('PUT', '/pr/templates', { list: TPL }).then(() => toast('Templates saved')).catch(failT); }, 900); }
 P.settings = () => `<div class="page-head"><div><h1>Settings</h1></div></div>
   <div class="set-layout"><nav class="set-nav"><div class="g">Payroll</div>${[['email', 'Email templates'], ['price', 'Price list'], ['news', 'News (tự cập nhật)']].map(([k, t]) => `<a class="${setTab === k ? 'on' : ''}" data-st="${k}">${t}</a>`).join('')}
-    <div class="g">Data</div>${[['import', 'Import from Google Sheet'], ['trash', 'Trash (payroll)']].map(([k, t]) => `<a class="${setTab === k ? 'on' : ''}" data-st="${k}">${t}</a>`).join('')}
+    <div class="g">Data</div>${[['import', 'Import lại (không bắt buộc)'], ['trash', 'Trash (payroll)']].map(([k, t]) => `<a class="${setTab === k ? 'on' : ''}" data-st="${k}">${t}</a>`).join('')}
     <div class="g mk-g">Dùng chung với Tax</div><span class="mk-off">Login · Users · Theme · Security → Settings của Tax</span></nav>
   <div class="set-main">${setTab === 'news' ? newsHtml() : setTab === 'import' ? importHtml() : setTab === 'price' ? priceHtml() : setTab === 'trash' ? trashHtml() : tplHtml()}</div></div>`;
 const tplHtml = () => `<div class="rules-top"><h2>Email templates</h2><button class="btn small" data-pa="addtpl">+ Add template</button></div>
@@ -605,7 +605,7 @@ function newsHtml() {
 function importHtml() {
   const st = SI && SI.stats;
   return `<h2 style="border-bottom:1px solid var(--line);padding-bottom:6px;margin-bottom:12px">Import from Google Sheet</h2>
-  <div class="hint" style="margin-bottom:12px">Google Sheet <b>Payroll Infos</b> → File › Download › Microsoft Excel (.xlsx) → chọn file ở đây → <b>Xem trước</b> → <b>Lưu</b>. Cần PR_ENC_KEY trên Netlify (mã hoá SSN / PIN / PW / bank). ${B.length ? `Hiện có <b>${B.length}</b> business: import lại = thay toàn bộ dữ liệu payroll.` : ''}</div>
+  <div class="hint" style="margin-bottom:12px"><b>Không cần dùng</b>: dữ liệu đã có sẵn từ <code>sql/11-v20-payroll-data.sql</code>. Chỉ dùng khi muốn nạp lại toàn bộ từ Google Sheet (File › Download › .xlsx) – sẽ <b>thay toàn bộ</b> dữ liệu payroll đang có.</div>
   <div class="btnrow"><input type="file" id="prfile" accept=".xlsx"><button class="btn" data-pa="impprev">Xem trước</button></div>
   ${SI && SI.busy ? '<div class="muted" style="margin-top:12px">Đang đọc file…</div>' : ''}
   ${st ? `<table class="t" style="max-width:760px;margin-top:14px"><tbody>
