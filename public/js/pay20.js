@@ -540,7 +540,7 @@ function HOME() {
   const wd = WD[new Date(TODAY + 'T12:00').getDay()];
   const NI = NEWS ? NEWS.items || [] : [];
   return `<div class="hero19"><div><div class="hellorow">${V20.hello('Hello ' + first + '!')}</div>
-      <div class="today19">${ti()}${wd}, <b>${md(TODAY)}</b> <button class="chip19" data-pa="theme">Theme</button></div></div>
+      <div class="today19">${ti()}${wd}, <b>${md(TODAY)}</b> <button class="chip19" data-pa="theme">Theme</button>${window.MECHIPS21 ? MECHIPS21() : ''}</div></div>
     <div class="herostats">${statStrip([
     ['Due · not received', `<span class="${dueT ? 'late' : 'ok'}">${usd(dueT)}</span>`, `${due.length} businesses`],
     [`Fees ${CYS} YTD`, usd(ytd), `<a href="#/p/fees" data-ft-go="summary">Summary →</a>`],

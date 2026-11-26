@@ -224,3 +224,282 @@ body.drag21{ cursor: cell; user-select: none; -webkit-user-select: none; }
 .appt21.pst-1 .week.w19 td.past.bk{ background: #e9ecef !important; }
 .appt21.pst-1 .week.w19 td.past.bk .anm, .appt21.pst-1 .week.w19 td.past.bk .anm .pre{ color: #3b4753; }
 .appt21.pst-1 .week.w19 th.past .dn21, .appt21.pst-1 .week.w19 th.past .dd21{ color: #6b7682; }
+
+/* ===================== v21.2: theme Gen Z ===================== */
+body[data-style=genz]{ --t1:#7c5cff; --t2:#f1ecff; --t3:#d9cffc; --tink:#1b1340; --pg:#fbfaff; --link:#6a4cf0; --cloud-ink:#5b3fd6;
+  background: #fbfaff radial-gradient(#e3dcfb 1px, transparent 1.2px) 0 0 / 18px 18px !important; }
+body[data-style=genz] .menubar{ background: #fff !important; border-bottom: 2.5px solid #1b1340 !important; padding-bottom: 34px !important; }
+body[data-style=genz] .nav button{ border-radius: 999px !important; padding: 6px 15px !important; margin: 6px 3px; border: 2px solid transparent !important; color: #1b1340 !important; text-transform: none; font-weight: 600; }
+body[data-style=genz] .nav button:hover{ border-color: #1b1340 !important; }
+body[data-style=genz] .nav button.on{ background: #1b1340 !important; color: #d4ff3a !important; border-color: #1b1340 !important; box-shadow: 3px 3px 0 #7c5cff; }
+body[data-style=genz] .band20.b-genz{ height: 30px; background: #d4ff3a; border-top: 2.5px solid #1b1340; }
+body[data-style=genz] .mq21{ overflow: hidden; height: 100%; }
+body[data-style=genz] .mqin21{ display: inline-flex; align-items: center; gap: 14px; white-space: nowrap; height: 100%; animation: mq21 38s linear infinite; font: 800 13px 'Bricolage Grotesque', 'Segoe UI', sans-serif; color: #1b1340; text-transform: uppercase; letter-spacing: .5px; padding-left: 14px; }
+body[data-style=genz] .mqin21 i{ width: 13px; height: 13px; display: inline-block; } body[data-style=genz] .mqin21 i svg{ width: 100%; height: 100%; display: block; }
+@keyframes mq21{ from{ transform: translateX(0); } to{ transform: translateX(-50%); } }
+body[data-style=genz] h1, body[data-style=genz] .page-head h1, body[data-style=genz] .pay19 h1, body[data-style=genz] h2.fhh, body[data-style=genz] .brand, body[data-style=genz] .banner .nm{ font-family: 'Bricolage Grotesque', 'Segoe UI', sans-serif !important; font-weight: 800 !important; color: #1b1340 !important; letter-spacing: -.6px; text-transform: none !important; }
+body[data-style=genz] .page-head h1, body[data-style=genz] .pay19 h1{ background: linear-gradient(transparent 58%, #d4ff3a 58%, #d4ff3a 90%, transparent 90%); display: inline-block; padding: 0 4px; }
+body[data-style=genz] .pay19 .card-head h2, body[data-style=genz] .pay19 .bd-h, body[data-style=genz] .pay19 .fyh h2{ color: #1b1340 !important; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; }
+body[data-style=genz] .btn.primary, body[data-style=genz] .btn.pri{ background: #7c5cff; border: 2px solid #1b1340; color: #fff; box-shadow: 3px 3px 0 #1b1340; border-radius: 10px; }
+body[data-style=genz] #sheets a.sub19{ color: #1b1340; } body[data-style=genz] #sheets a.sub19.on{ background: #1b1340; color: #d4ff3a; border-radius: 999px; }
+/* name tags: sticker pills */
+body[data-style=genz] .ts-tag .st20:not(.add){ background: color-mix(in srgb, var(--c) 22%, #fff) !important; color: #1b1340 !important; border: 2px solid #1b1340 !important; border-radius: 999px !important; box-shadow: 3px 3px 0 #1b1340; padding: 4px 14px 4px 10px; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; }
+body[data-style=genz] .ts-tag .st20:not(.add):hover, body[data-style=genz] .ts-tag .st20.on{ background: var(--c) !important; color: #fff !important; transform: translate(-1px, -1px) rotate(-2deg); box-shadow: 4px 4px 0 #1b1340; }
+body[data-style=genz] .ts-tag .thole{ background: #fff; box-shadow: inset 0 0 0 2px #1b1340; }
+/* cards: neo-brutal */
+body[data-style=genz] .stab21 .banner.b21{ border: 2.5px solid #1b1340 !important; box-shadow: 6px 6px 0 #1b1340; background: linear-gradient(110deg, #fff 0%, #fff 40%, #f1ecff 70%, #eaffc0 100%) !important; border-radius: 18px; }
+body[data-style=genz] .stab21 .banner.b21::before{ display: none; }
+body[data-style=genz] .stab21 .statbar.sb21 .c{ border: 2px solid #1b1340 !important; box-shadow: 3px 3px 0 #1b1340; border-radius: 14px; }
+body[data-style=genz] .stab21 .statbar.sb21 .c.k-wait{ background: #fff0f7; }
+body[data-style=genz] .stab21 .wrap{ border: 2.5px solid #1b1340; box-shadow: 5px 5px 0 #1b1340; border-radius: 14px; }
+body[data-style=genz] .stab21 table.sheet th{ background: #1b1340 !important; color: #d4ff3a !important; border-bottom: 0 !important; }
+body[data-style=genz] .appt21 .week.w19 th.today21 .dd21{ background: #1b1340; color: #d4ff3a; }
+body[data-style=genz] .appt21 .wk21 .tw21{ background: #d4ff3a; color: #1b1340; border: 1.5px solid #1b1340; }
+body[data-style=genz] .appt21 .abar21 > .btn.on{ border-bottom-color: #7c5cff; }
+.hscene .bob21{ animation: bob21 3.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes bob21{ 0%, 100%{ transform: translateY(0) rotate(0); } 50%{ transform: translateY(-6px) rotate(4deg); } }
+.hscene .tw21{ animation: tw21 2.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes tw21{ 0%, 100%{ opacity: 1; } 50%{ opacity: .35; } }
+.stk21{ position: fixed; z-index: 0; pointer-events: none; opacity: .5; animation: bob21 5s ease-in-out infinite; }
+body.nomo20 .bob21, body.nomo20 .tw21, body.nomo20 .stk21, body.nomo20 .mqin21{ animation: none !important; }
+
+/* keyframes dùng chung (từ theme Đô thị cũ) */
+@keyframes ln21{ from{ background-position: 0 0; } to{ background-position: -44px 0; } }
+@keyframes sc21{ from{ left: -80px; } to{ left: 102%; } }
+@keyframes sc21r{ from{ left: 102%; } to{ left: -80px; } }
+
+/* ===================== v21.3: chung cho 6 theme mới ===================== */
+.hscene .spin21{ animation: spin21 60s linear infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes spin21{ to{ transform: rotate(360deg); } }
+.hscene .swim21{ animation: swim21 13s linear infinite; }
+.hscene .swim21.r{ animation-name: swim21r; animation-duration: 17s; }
+@keyframes swim21{ from{ transform: translateX(-60px); } to{ transform: translateX(110%); } }
+@keyframes swim21r{ from{ transform: translateX(110%); } to{ transform: translateX(-60px); } }
+.hscene .bub21{ animation: bub21 5s ease-in infinite; }
+@keyframes bub21{ from{ transform: translateY(0); opacity: 0; } 15%{ opacity: .9; } to{ transform: translateY(-240px); opacity: 0; } }
+.hscene .sway21{ animation: sway21 4s ease-in-out infinite alternate; }
+@keyframes sway21{ from{ transform: rotate(-4deg); } to{ transform: rotate(4deg); } }
+.swing21{ animation: swing21 3.4s ease-in-out infinite alternate; }
+@keyframes swing21{ from{ transform: rotate(-5deg); } to{ transform: rotate(5deg); } }
+.hscene .van21{ animation: van21 .5s ease-in-out infinite alternate; }
+@keyframes van21{ from{ transform: translateY(0); } to{ transform: translateY(-1.5px); } }
+.hscene .stm21, .stm21{ animation: stm 2.4s ease-in-out infinite; }
+body.nomo20 .spin21, body.nomo20 .swim21, body.nomo20 .bub21, body.nomo20 .sway21, body.nomo20 .swing21, body.nomo20 .van21, body.nomo20 .tw21b, body.nomo20 .gv21, body.nomo20 .aq21b, body.nomo20 .bb21, body.nomo20 .ln21c{ animation: none !important; }
+@media (prefers-reduced-motion: reduce){ .spin21, .swim21, .bub21, .sway21, .swing21, .van21, .tw21b, .gv21, .aq21b, .bb21, .ln21c{ animation: none !important; } }
+.tw21b{ position: absolute; animation: tw21 2.4s ease-in-out infinite; line-height: 1; }
+.tw21b svg{ display: block; }
+
+/* zodiac + snack chips next to "Hôm nay là …" */
+.mec21{ display: inline-flex; gap: 6px; margin-left: 6px; vertical-align: middle; }
+.mec21 > span{ display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; padding: 2px 10px 2px 7px; border-radius: 999px; background: #fff; border: 1px solid var(--t3, #e3d9cc); color: #3b4753; font-weight: 600; white-space: nowrap; }
+.mec21 .zc21 b{ font-size: 15px; color: var(--t1, #d9822b); font-weight: 400; }
+.mec21 .em{ color: #9aa4ad; font-weight: 500; border-style: dashed; cursor: pointer; }
+.mec21 svg{ display: block; }
+/* theme picker */
+.th21{ max-height: 88vh; overflow: auto; }
+.th21 .thgrid{ grid-template-columns: repeat(3, 1fr) !important; }
+.th21 h4{ margin: 16px 0 8px; }
+.zdg21{ display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.zdg21 button, .fdg21 button{ border: 1px solid #dde2e7; background: #fff; border-radius: 10px; padding: 6px 4px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 1px; font: inherit; }
+.zdg21 b{ font-size: 20px; color: #6a5acd; font-weight: 400; line-height: 1.1; } .zdg21 span{ font-size: 12.5px; font-weight: 600; } .zdg21 small{ font-size: 10.5px; color: #8a96a3; }
+.zdg21 button.on, .fdg21 button.on{ border-color: var(--t1, #d9822b); background: color-mix(in srgb, var(--t1, #d9822b) 10%, #fff); box-shadow: 0 0 0 2px color-mix(in srgb, var(--t1, #d9822b) 35%, transparent); }
+
+/* ---------- Gen Z · Groovy ---------- */
+body[data-style=groovy]{ --t1:#ef6f3c; --t2:#fff1db; --t3:#f2d9b0; --tink:#7a4a2a; --pg:#fff8ec; --link:#c4532f; --cloud-ink:#c4532f; background: #fff8ec !important; }
+body[data-style=groovy] .menubar{ background: #fff1db !important; border: 0 !important; padding-bottom: 32px !important; }
+body[data-style=groovy] .band20.b-groovy{ height: 28px; }
+body[data-style=groovy] .gv21{ position: absolute; inset: 0; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='28'%3E%3Cpath d='M0 4 q20 -8 40 0 t40 0 V10 q-20 8 -40 0 t-40 0Z' fill='%23f2b134'/%3E%3Cpath d='M0 11 q20 -8 40 0 t40 0 V17 q-20 8 -40 0 t-40 0Z' fill='%23ef6f3c'/%3E%3Cpath d='M0 18 q20 -8 40 0 t40 0 V24 q-20 8 -40 0 t-40 0Z' fill='%237a4a2a'/%3E%3C/svg%3E") repeat-x 0 0 / 80px 28px; animation: gv21 6s linear infinite; }
+@keyframes gv21{ to{ background-position: -80px 0; } }
+body[data-style=groovy] .nav button{ color: #7a4a2a !important; font-weight: 700; }
+body[data-style=groovy] .nav button.on{ color: #c4532f !important; border-bottom-color: #ef6f3c !important; }
+body[data-style=groovy] h1, body[data-style=groovy] .page-head h1, body[data-style=groovy] .pay19 h1, body[data-style=groovy] h2.fhh{ font-family: Pacifico, cursive !important; font-weight: 400 !important; color: #c4532f !important; text-transform: none !important; letter-spacing: 0; }
+body[data-style=groovy] .pay19 .card-head h2, body[data-style=groovy] .pay19 .bd-h, body[data-style=groovy] .pay19 .fyh h2{ color: #7a4a2a !important; }
+body[data-style=groovy] .ts-tag .st20:not(.add){ background: #fff4e0 !important; color: #7a4a2a !important; border: 2px solid #7a4a2a !important; border-radius: 999px !important; font-weight: 800; box-shadow: 0 3px 0 var(--c); }
+body[data-style=groovy] .stab21 .banner.b21{ background: linear-gradient(105deg, #fff 30%, #fff1db 70%, #ffe1c8 100%) !important; border-color: #f2d9b0 !important; border-radius: 22px; }
+body[data-style=groovy] .stab21 table.sheet th{ background: #7a4a2a !important; color: #fff1db !important; border-bottom: 4px solid #f2b134 !important; }
+
+/* ---------- Cung Hoàng Đạo ---------- */
+body[data-style=zodiac]{ --t1:#6a5acd; --t2:#f1effb; --t3:#ddd8f3; --tink:#1d2450; --pg:#f7f6fc; --link:#5a4ad0; --cloud-ink:#5a4ad0; background: #f7f6fc !important; }
+body[data-style=zodiac] .menubar{ background: #1d2450 !important; border: 0 !important; padding-bottom: 32px !important; }
+body[data-style=zodiac] .band20.b-zodiac{ height: 30px; background: linear-gradient(180deg, #1d2450, #2d3577); }
+body[data-style=zodiac] .nav button{ color: #d8ccff !important; }
+body[data-style=zodiac] .nav button.on, body[data-style=zodiac] .nav button:hover{ color: #ffe08a !important; border-bottom-color: #e8c46a !important; }
+body[data-style=zodiac] h1, body[data-style=zodiac] .page-head h1, body[data-style=zodiac] .pay19 h1, body[data-style=zodiac] h2.fhh{ font-family: Georgia, serif !important; font-style: italic; font-weight: 600 !important; color: #1d2450 !important; text-transform: none !important; }
+body[data-style=zodiac] .pay19 .card-head h2, body[data-style=zodiac] .pay19 .bd-h, body[data-style=zodiac] .pay19 .fyh h2{ color: #1d2450 !important; }
+body[data-style=zodiac] .ts-tag .st20:not(.add){ background: linear-gradient(180deg, #232a5c, #1d2450) !important; color: #ffe08a !important; border: 1.5px solid #e8c46a !important; border-radius: 6px !important; font-family: Georgia, serif; font-style: italic; box-shadow: inset 0 0 0 3px #1d2450, inset 0 0 0 4px rgba(232,196,106,.5); }
+body[data-style=zodiac] .ts-tag .thole{ background: #e8c46a; box-shadow: none; }
+body[data-style=zodiac] .stab21 .banner.b21{ background: linear-gradient(105deg, #fff 30%, #ece9fb 70%, #dcd6f7 100%) !important; border-color: #ddd8f3 !important; }
+body[data-style=zodiac] .stab21 table.sheet th{ background: #1d2450 !important; color: #ffe08a !important; border-bottom: 2px solid #e8c46a !important; }
+body[data-style=zodiac] .appt21 .week.w19 th.today21 .dd21{ background: #1d2450; color: #ffe08a; }
+
+/* ===================== v21.4 ===================== */
+/* con giáp seal + picker */
+.mec21 .zc21{ cursor: pointer; }
+/* Quick reading (thay Bảng dán giấy + Trưa nay ăn gì) */
+.pulse19.r21{ grid-template-columns: 1fr 1.55fr !important; }
+.rd21 h3{ display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rdt21{ display: inline-flex; gap: 4px; margin-left: auto; }
+.rdt21 button{ border: 1px solid var(--t3, #e3d9cc); background: #fff; border-radius: 999px; padding: 3px 11px 3px 6px; font: inherit; font-size: 12.5px; font-weight: 600; color: #5b6772; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+.rdt21 button b{ font-weight: 400; font-size: 15px; color: var(--t1, #d9822b); }
+.rdt21 button.on{ background: var(--t1, #d9822b); border-color: var(--t1, #d9822b); color: #fff; } .rdt21 button.on b{ color: #fff; }
+.rdh21{ display: flex; align-items: center; gap: 12px; margin: 6px 0 10px; }
+.rdh21 .rdg21{ width: 46px; height: 46px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 26px; color: #ffe08a; background: radial-gradient(circle at 35% 30%, #3a3f86, #1b2152); box-shadow: 0 0 0 3px #f3eed8; }
+.rdh21 > div{ display: flex; flex-direction: column; } .rdh21 b{ font-size: 16px; color: #24313d; } .rdh21 small{ color: #8a96a3; font-size: 12px; }
+.rds21{ margin-left: auto; white-space: nowrap; font-size: 18px; color: #f2b632; letter-spacing: 2px; } .rds21 i{ color: #e3e6ea; font-style: normal; }
+.rdg21b{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; }
+.rdg21b > div{ display: flex; flex-direction: column; gap: 2px; font-size: 13.5px; color: #3b4753; line-height: 1.4; }
+.rdg21b .l{ font-size: 11.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--tink, #6b4a32); display: flex; align-items: center; gap: 8px; }
+.rdg21b .l em{ font-style: normal; color: var(--t1, #d9822b); font-size: 9px; letter-spacing: 1px; } .rdg21b .l em i{ color: #e3e6ea; font-style: normal; }
+.rdf21{ display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--t3, #e3d9cc); font-size: 13px; color: #5b6772; }
+.rdf21 b{ color: #24313d; margin-left: 4px; } .rdf21 .dot{ display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-left: 6px; vertical-align: -1px; box-shadow: 0 0 0 1px rgba(0,0,0,.1); }
+.rdf21 .tip{ flex-basis: 100%; color: #3b4753; font-style: italic; } .rdf21 .tip::before{ content: '✦ '; color: var(--t1, #d9822b); font-style: normal; }
+.rde21{ text-align: center; padding: 18px 10px; color: #5b6772; } .rdi21{ display: flex; justify-content: center; gap: 8px; font-size: 22px; color: var(--t1, #d9822b); margin-bottom: 8px; }
+@media (max-width: 760px){ .pulse19.r21{ grid-template-columns: 1fr !important; } .rdg21b{ grid-template-columns: 1fr; } }
+
+/* animations used by the scenes */
+.hscene .shoot21{ animation: shoot21 7s ease-in infinite; }
+@keyframes shoot21{ 0%{ transform: translate(110%, -20px); opacity: 0; } 70%{ transform: translate(110%, -20px); opacity: 0; } 72%{ opacity: 1; } 100%{ transform: translate(30%, 120px); opacity: 0; } }
+.hscene .jel21{ animation: jel21 4s ease-in-out infinite; }
+@keyframes jel21{ 0%, 100%{ transform: translateY(0) scaleY(1); } 50%{ transform: translateY(-10px) scaleY(.92); } }
+.hscene .ray21{ animation: ray21 6s ease-in-out infinite alternate; }
+@keyframes ray21{ from{ opacity: .04; } to{ opacity: .13; } }
+.hscene .fly21{ animation: fly21 12s linear infinite; }
+@keyframes fly21{ 0%{ transform: translate(-40px, 300px); } 100%{ transform: translate(110%, -60px); } }
+.hscene .flm21{ animation: flm21 .25s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: top center; }
+@keyframes flm21{ from{ transform: scaleY(.7); } to{ transform: scaleY(1.2); } }
+body.nomo20 .shoot21, body.nomo20 .jel21, body.nomo20 .ray21, body.nomo20 .fly21, body.nomo20 .flm21, body.nomo20 .mqin21m, body.nomo20 .rk21, body.nomo20 .shb21{ animation: none !important; }
+@media (prefers-reduced-motion: reduce){ .shoot21, .jel21, .ray21, .fly21, .flm21, .mqin21m, .rk21, .shb21{ animation: none !important; } }
+
+/* Zodiac band: sao băng */
+body[data-style=zodiac] .shb21{ position: absolute; top: 4px; left: 100%; width: 70px; height: 2px; background: linear-gradient(90deg, #fff, transparent); border-radius: 2px; transform: rotate(-12deg); animation: shb21 9s linear infinite; }
+@keyframes shb21{ 0%, 80%{ left: 100%; opacity: 0; } 82%{ opacity: 1; } 100%{ left: 30%; top: 22px; opacity: 0; } }
+body[data-style=zodiac] .pulse19 .rd21{ background: linear-gradient(160deg, #fff 60%, #f1eefc); }
+
+/* ---------- Thần đồng toán học ---------- */
+body[data-style=math]{ --t1:#2f5d50; --t2:#eef5f1; --t3:#cfe0d8; --tink:#244a40; --pg:#fbfdfc; --link:#2b5fb4; --cloud-ink:#2b5fb4;
+  background: #fbfdfc linear-gradient(#e6eef5 1px, transparent 1px) 0 0 / 22px 22px, linear-gradient(90deg, #e6eef5 1px, #fbfdfc 1px) 0 0 / 22px 22px !important; }
+body[data-style=math] .menubar{ background: #2f5d50 !important; border: 0 !important; padding-bottom: 40px !important; }
+body[data-style=math] .band20.b-math{ height: 36px; }
+body[data-style=math] .rul21{ position: absolute; left: 0; right: 0; top: 0; height: 14px; background: #f2d478 repeating-linear-gradient(90deg, #7a6a3a 0 1px, transparent 1px 10px) 0 0 / 100px 5px no-repeat; }
+body[data-style=math] .rul21{ background: linear-gradient(#f2d478, #f2d478); }
+body[data-style=math] .rul21::before{ content: ''; position: absolute; inset: 0 0 auto; height: 7px; background: repeating-linear-gradient(90deg, #7a6a3a 0 1px, transparent 1px 10px), repeating-linear-gradient(90deg, #7a6a3a 0 1px, transparent 1px 50px); background-size: auto 4px, auto 7px; background-repeat: repeat-x; }
+body[data-style=math] .mq21m{ position: absolute; left: 0; right: 0; top: 14px; bottom: 0; overflow: hidden; background: #244a40; }
+body[data-style=math] .mqin21m{ display: inline-flex; gap: 34px; white-space: nowrap; height: 100%; align-items: center; font: 400 14px 'Gloria Hallelujah', cursive; color: #f4f1e6; animation: mq21 48s linear infinite; padding-left: 20px; }
+body[data-style=math] .nav button{ color: #e6f1ec !important; }
+body[data-style=math] .nav button.on, body[data-style=math] .nav button:hover{ color: #f2c94c !important; border-bottom-color: #f2c94c !important; }
+body[data-style=math] h1, body[data-style=math] .page-head h1, body[data-style=math] .pay19 h1, body[data-style=math] h2.fhh{ font-family: 'Gloria Hallelujah', cursive !important; font-weight: 400 !important; color: #244a40 !important; text-transform: none !important; }
+body[data-style=math] .page-head h1, body[data-style=math] .pay19 h1{ text-decoration: underline wavy #e5484d 2px; text-underline-offset: 6px; }
+body[data-style=math] .pay19 .card-head h2, body[data-style=math] .pay19 .bd-h, body[data-style=math] .pay19 .fyh h2{ color: #244a40 !important; }
+body[data-style=math] .ts-tag .st20:not(.add){ background: #fff linear-gradient(#e3edf6 1px, transparent 1px) 0 0 / 100% 7px !important; color: #24313d !important; border: 1px solid #c9d6e2 !important; border-radius: 2px !important; font-family: 'Gloria Hallelujah', cursive; font-weight: 400; padding: 3px 14px 2px 10px !important; box-shadow: 1px 2px 0 rgba(0,0,0,.08); border-left: 4px solid var(--c) !important; transform: rotate(-1deg); }
+body[data-style=math] .ts-tag .st20:not(.add):nth-child(even){ transform: rotate(1deg); }
+body[data-style=math] .ts-tag .thole{ background: #e5484d; box-shadow: none; width: 6px; height: 6px; }
+body[data-style=math] .stab21 .banner.b21{ background: #fff linear-gradient(#e6eef5 1px, transparent 1px) 0 0 / 100% 22px !important; border-color: #cfe0d8 !important; }
+body[data-style=math] .stab21 table.sheet th{ background: #2f5d50 !important; color: #f4f1e6 !important; border-bottom: 3px solid #f2c94c !important; }
+body[data-style=math] .appt21 .week.w19 th.today21 .dd21{ background: #2f5d50; color: #f2c94c; }
+
+/* ---------- Universe ---------- */
+body[data-style=universe]{ --t1:#7b4ee0; --t2:#f2eeff; --t3:#ddd3fb; --tink:#1c1150; --pg:#f7f6ff; --link:#6a3fd6; --cloud-ink:#6a3fd6; background: #f7f6ff !important; }
+body[data-style=universe] .menubar{ background: linear-gradient(90deg, #0b0f2e, #1c1150 60%, #3a1260) !important; border: 0 !important; padding-bottom: 38px !important; }
+body[data-style=universe] .band20.b-universe{ height: 34px; background: linear-gradient(90deg, #0b0f2e, #1c1150 60%, #3a1260); }
+body[data-style=universe] .pl21b{ position: absolute; top: 0; } body[data-style=universe] .pl21b svg{ display: block; }
+body[data-style=universe] .rk21{ position: absolute; top: 2px; left: -40px; animation: sc21 22s linear infinite; } body[data-style=universe] .rk21 svg{ display: block; }
+body[data-style=universe] .nav button{ color: #d7d9ff !important; }
+body[data-style=universe] .nav button.on, body[data-style=universe] .nav button:hover{ color: #9fe8ff !important; border-bottom-color: #9fe8ff !important; }
+body[data-style=universe] h1, body[data-style=universe] .page-head h1, body[data-style=universe] .pay19 h1, body[data-style=universe] h2.fhh{ font-family: Montserrat, sans-serif !important; font-weight: 800 !important; color: #2a1866 !important; text-transform: none !important; letter-spacing: -.3px; }
+body[data-style=universe] .page-head h1, body[data-style=universe] .pay19 h1{ background: linear-gradient(90deg, #2a1866, #7b4ee0 60%, #2b9fd0); -webkit-background-clip: text; background-clip: text; color: transparent !important; }
+body[data-style=universe] .pay19 .card-head h2, body[data-style=universe] .pay19 .bd-h, body[data-style=universe] .pay19 .fyh h2{ color: #2a1866 !important; }
+body[data-style=universe] .ts-tag .st20:not(.add){ background: linear-gradient(180deg, #241a5e, #1c1150) !important; color: #e9e4ff !important; border: 1px solid #4a3a9a !important; border-radius: 999px !important; font-weight: 700; padding-left: 8px !important; box-shadow: 0 0 10px rgba(123,78,224,.25); }
+body[data-style=universe] .ts-tag .thole{ width: 12px; height: 12px; background: radial-gradient(circle at 35% 30%, #fff, var(--c) 60%); box-shadow: 0 0 6px var(--c); }
+body[data-style=universe] .ts-tag .st20:not(.add):hover, body[data-style=universe] .ts-tag .st20.on{ box-shadow: 0 0 0 2px #9fe8ff, 0 0 14px rgba(159,232,255,.5); }
+body[data-style=universe] .stab21 .banner.b21{ background: linear-gradient(105deg, #fff 30%, #efeaff 65%, #e2f6ff 100%) !important; border-color: #ddd3fb !important; }
+body[data-style=universe] .stab21 table.sheet th{ background: #1c1150 !important; color: #9fe8ff !important; border-bottom: 2px solid #7b4ee0 !important; }
+body[data-style=universe] .appt21 .week.w19 th.today21 .dd21{ background: #1c1150; color: #9fe8ff; }
+
+.modal .box.th21{ width: min(1000px, 95vw) !important; max-width: none !important; }
+.th21 .thgrid{ grid-template-columns: repeat(4, 1fr) !important; }
+.th21 .thcard .thprev{ height: 64px !important; }
+.th21 .thcard .thprev svg{ width: 100%; height: 100%; }
+@media (max-width: 760px){ .th21 .thgrid{ grid-template-columns: repeat(2, 1fr) !important; } .zdg21{ grid-template-columns: repeat(3, 1fr); } }
+
+/* ===== v21.5: Universe ma mị ===== */
+.hscene .orb21{ animation: orb21 14s linear infinite; transform-origin: 0 0; }
+@keyframes orb21{ to{ transform: rotate(360deg); } }
+body.nomo20 .orb21{ animation: none !important; }
+body[data-style=universe]{ background: #f5f3ff radial-gradient(1200px 300px at 80% -80px, rgba(123,78,224,.14), transparent 70%) !important; }
+body[data-style=universe] .menubar{ background: radial-gradient(600px 120px at 20% 120%, rgba(255,63,164,.35), transparent 70%), radial-gradient(500px 120px at 80% -20%, rgba(56,214,255,.28), transparent 70%), linear-gradient(90deg, #05061a, #120a33 60%, #25083d) !important; }
+body[data-style=universe] .band20.b-universe{ background: radial-gradient(400px 60px at 30% 100%, rgba(255,63,164,.35), transparent 70%), radial-gradient(400px 60px at 75% 0%, rgba(56,214,255,.3), transparent 70%), linear-gradient(90deg, #05061a, #120a33 60%, #25083d); }
+body[data-style=universe] .rd21{ background: linear-gradient(160deg, #fff 55%, #f1ecff); }
+/* v21.5 Quick reading: nội dung thật */
+.rdq21{ margin: 4px 0 0; padding: 12px 16px; border-left: 3px solid var(--t1, #d9822b); background: color-mix(in srgb, var(--t2, #fdf1e3) 70%, #fff); border-radius: 0 10px 10px 0; font-size: 14px; line-height: 1.6; color: #2b3640; font-style: italic; }
+.rdq21.ld{ font-style: normal; color: #8a96a3; border-left-style: dashed; }
+.rdf21 .src{ font-size: 12px; color: #8a96a3; } .rdf21 .src a{ color: inherit; text-decoration: underline; }
+.rdf21 .vn{ margin-left: auto; font-weight: 600; color: var(--link, #1a5fb4); text-decoration: none; }
+.rdl21{ display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border: 1px solid var(--t3, #e3d9cc); border-radius: 12px; text-decoration: none; color: #24313d; background: #fff; transition: box-shadow .15s, transform .15s; }
+.rdl21:hover{ box-shadow: 0 4px 14px rgba(0,0,0,.08); transform: translateY(-1px); }
+.rdl21 small{ color: #8a96a3; font-size: 11.5px; text-transform: uppercase; letter-spacing: .5px; } .rdl21 b{ font-size: 15px; line-height: 1.4; } .rdl21 span{ color: var(--link, #1a5fb4); font-weight: 600; font-size: 13px; }
+
+/* ===================== v21.6 ===================== */
+/* Tax Homepage đầu trang giống Payroll Home: hello rộng, cột phải nhỏ */
+.hero19.tx21{ grid-template-columns: minmax(0, 1.45fr) minmax(300px, 1fr) !important; gap: 40px; }
+.hero19.tx21 .hellorow{ min-height: 0; }
+.hero19.tx21 .tright20 .herostats .ssv{ font-size: 16px; line-height: 1.5; }
+.hero19.tx21 .tright20 .txt20{ font-size: 16px; }
+.hero19.tx21 .tright20 .ss:last-child .ssv{ font-size: 26px; }
+.hero19.tx21 .tright20 .ss{ padding: 10px 0; }
+@media (max-width: 760px){ .hero19.tx21{ grid-template-columns: 1fr !important; } }
+
+/* dải chạy dưới menu cho Cruising / Pro / Zodiac / Universe */
+.band20 .mq6{ position: absolute; left: 0; right: 0; overflow: hidden; white-space: nowrap; }
+.band20 .mq6 > div{ display: inline-flex; gap: 30px; align-items: center; animation: mq21 60s linear infinite; padding-left: 20px; }
+body.nomo20 .band20 .mq6 > div, body.nomo20 .sail6, body.nomo20 .gull6, body.nomo20 .sf6, body.nomo20 .pl6{ animation: none !important; }
+@media (prefers-reduced-motion: reduce){ .band20 .mq6 > div, .sail6, .gull6, .sf6, .pl6{ animation: none !important; } }
+/* Cruising: thuyền buồm + tàu nhỏ + hải âu trên sóng */
+body[data-style=cruise] .band20.b-cruise{ height: 46px; }
+body[data-style=cruise] .sail6{ position: absolute; bottom: 6px; left: -80px; animation: sc21 34s linear infinite; }
+body[data-style=cruise] .sail6.s2{ animation: sc21r 52s linear infinite; bottom: 9px; opacity: .8; }
+body[data-style=cruise] .sail6 svg, body[data-style=cruise] .gull6 svg{ display: block; }
+body[data-style=cruise] .gull6{ position: absolute; top: 2px; left: -40px; animation: gull6 26s linear infinite; }
+@keyframes gull6{ 0%{ left: -40px; transform: translateY(0); } 25%{ transform: translateY(-3px); } 50%{ transform: translateY(2px); } 75%{ transform: translateY(-2px); } 100%{ left: 104%; transform: translateY(0); } }
+/* Pro: băng chữ chạy như bảng giá chứng khoán */
+body[data-style=pro] .menubar{ padding-bottom: 30px !important; position: relative; }
+body[data-style=pro] .band20.b-pro{ height: 26px; background: #0e2846; border-top: 1px solid #c9a227; }
+body[data-style=pro] .band20.b-pro .mq6{ top: 0; bottom: 0; } body[data-style=pro] .band20.b-pro .mq6 > div{ height: 100%; font: 600 12px 'Source Serif 4', Georgia, serif; letter-spacing: 1.5px; color: #e9edf3; text-transform: uppercase; }
+body[data-style=pro] .band20.b-pro .mq6 b{ color: #c9a227; font-weight: 700; } body[data-style=pro] .band20.b-pro .mq6 i{ color: #c9a227; font-style: normal; }
+/* Zodiac: 12 cung chạy chậm + sao */
+body[data-style=zodiac] .band20.b-zodiac .mq6{ top: 6px; } body[data-style=zodiac] .band20.b-zodiac .mq6 > div{ font: italic 13px Georgia, serif; color: #d8ccff; gap: 26px; animation-duration: 70s; }
+body[data-style=zodiac] .band20.b-zodiac .mq6 b{ color: #ffe08a; font-style: normal; font-size: 15px; margin-right: 5px; }
+body[data-style=zodiac] .band20.b-zodiac .tw21b{ opacity: .55; }
+/* Universe: trường sao trôi 2 lớp + hành tinh trôi */
+body[data-style=universe] .sf6{ position: absolute; inset: 0; background-repeat: repeat; animation: sf6 40s linear infinite; }
+body[data-style=universe] .sf6.a{ background-image: radial-gradient(1.2px 1.2px at 10px 8px, #fff 60%, transparent), radial-gradient(1px 1px at 70px 22px, #cfe9ff 60%, transparent), radial-gradient(1.4px 1.4px at 130px 14px, #fff 60%, transparent), radial-gradient(1px 1px at 180px 28px, #ffd6f2 60%, transparent); background-size: 200px 34px; }
+body[data-style=universe] .sf6.b{ background-image: radial-gradient(1px 1px at 40px 18px, #9fe8ff 60%, transparent), radial-gradient(.8px .8px at 110px 6px, #fff 60%, transparent), radial-gradient(1px 1px at 160px 26px, #fff 60%, transparent); background-size: 220px 34px; animation-duration: 22s; opacity: .8; }
+@keyframes sf6{ from{ background-position: 0 0; } to{ background-position: -400px 0; } }
+body[data-style=universe] .pl6{ position: absolute; top: 2px; animation: pl6 70s linear infinite; } body[data-style=universe] .pl6 svg{ display: block; }
+body[data-style=universe] .pl6.p2{ animation-duration: 95s; animation-delay: -40s; top: 10px; }
+@keyframes pl6{ from{ left: 104%; } to{ left: -60px; } }
+body[data-style=universe] .band20.b-universe .pl21b{ display: none; }
+.hero19.tx21 .hellorow > div, .hero19.tx21 #hello19{ width: 100%; }
+.hero19.tx21 #hello19 .hello-in{ width: 100%; }
+.hero19.tx21 #hello19 svg.hscene{ width: 100%; max-width: 640px; height: auto; display: block; }
+
+/* ===================== v21.7 ===================== */
+/* Zodiac: sao băng liên tục + ký hiệu cung bay lên */
+body[data-style=zodiac] .band20.b-zodiac .mq6{ display: none; }
+body[data-style=zodiac] .ss6{ position: absolute; top: -6px; width: 90px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, rgba(255,255,255,0), #fff 70%, #ffe08a); box-shadow: 0 0 6px #fff; transform: rotate(-24deg); opacity: 0; animation: ss6 3.6s ease-in infinite; }
+@keyframes ss6{ 0%{ transform: translate(0, 0) rotate(-24deg); opacity: 0; } 8%{ opacity: 1; } 55%{ opacity: .9; } 70%, 100%{ transform: translate(-150px, 70px) rotate(-24deg); opacity: 0; } }
+body[data-style=zodiac] .zg6{ position: absolute; bottom: -4px; color: #ffe08a; font-size: 14px; text-shadow: 0 0 8px rgba(255,224,138,.9); opacity: 0; animation: zg6 4.5s ease-out infinite; }
+@keyframes zg6{ 0%{ transform: translateY(0) scale(.7); opacity: 0; } 20%{ opacity: 1; } 80%{ opacity: .7; } 100%{ transform: translateY(-34px) scale(1.15); opacity: 0; } }
+/* Cruising: dải cờ hiệu hàng hải chạy + sóng nhanh hơn + thuyền to hơn */
+body[data-style=cruise] .menubar{ padding-bottom: 46px !important; animation-duration: 9s !important; }
+body[data-style=cruise] .band20.b-cruise{ height: 50px; }
+body[data-style=cruise] .flg6{ position: absolute; left: 0; right: 0; top: 0; height: 18px; animation: flg6 14s linear infinite; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='18'%3E%3Cpath d='M0 3 Q40 8 80 3 T160 3' stroke='%235b7d93' stroke-width='1.2' fill='none'/%3E%3Cpath d='M8 4.5 L18 5.5 L13 16Z' fill='%23e5484d'/%3E%3Crect x='26' y='5.6' width='10' height='9' fill='%23ffd35c'/%3E%3Crect x='26' y='5.6' width='5' height='4.5' fill='%233f5a6e'/%3E%3Crect x='31' y='10.1' width='5' height='4.5' fill='%233f5a6e'/%3E%3Cpath d='M44 6 L54 6 L49 16Z' fill='%23ffffff' stroke='%233f5a6e' stroke-width='.8'/%3E%3Crect x='62' y='5' width='10' height='9' fill='%233f5a6e'/%3E%3Crect x='65' y='7.5' width='4' height='4' fill='%23ffffff'/%3E%3Cpath d='M86 4 L96 4.6 L91 15Z' fill='%232b9fd0'/%3E%3Crect x='104' y='5.5' width='10' height='9' fill='%23ffffff' stroke='%23e5484d' stroke-width='1.6'/%3E%3Cpath d='M122 6.4 L132 6.6 L127 16Z' fill='%23ffd35c'/%3E%3Crect x='140' y='5' width='10' height='9' fill='%23e5484d'/%3E%3Cpath d='M140 5 L150 14' stroke='%23ffffff' stroke-width='2'/%3E%3C/svg%3E") repeat-x 0 0 / 160px 18px; }
+@keyframes flg6{ from{ background-position: 0 0; } to{ background-position: -320px 0; } }
+body[data-style=cruise] .flg6{ animation-name: flg6, flgw6; animation-duration: 14s, 2.4s; animation-timing-function: linear, ease-in-out; animation-iteration-count: infinite; animation-direction: normal, alternate; }
+@keyframes flgw6{ from{ transform: translateY(0); } to{ transform: translateY(1.5px); } }
+body[data-style=cruise] .sail6{ bottom: 8px; animation-duration: 22s; }
+body[data-style=cruise] .sail6.s2{ animation-duration: 30s; bottom: 11px; opacity: .9; }
+body[data-style=cruise] .sail6.s3{ animation-duration: 26s; bottom: 6px; }
+body[data-style=cruise] .gull6{ top: 18px; animation-duration: 16s; }
+body.nomo20 .ss6, body.nomo20 .zg6, body.nomo20 .flg6{ animation: none !important; }
+body.nomo20 .zg6{ display: none; }
+@media (prefers-reduced-motion: reduce){ .ss6, .zg6, .flg6{ animation: none !important; } }

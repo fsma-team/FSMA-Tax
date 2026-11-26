@@ -506,8 +506,8 @@ function heroHtml20() {
     ['Thông báo', `<span class="txt20">${esc(S.notice || '—')}</span>`, isAdmin() ? '<a href="#" id="editNotice">sửa</a>' : ''],
     ['Quote', `<span class="txt20 q20" data-qk="home" title="Bấm để đổi câu">“${esc(quoteFor('home'))}”</span>`, ''],
     ['Tax day ' + T.d.slice(0, 4), `${T.n} <span class="u20">ngày</span>`, mdy(T.d)]]);
-  return `<div class="hero19"><div class="hl"><div class="hellorow"><div id="hello19">${helloSvg()}</div></div>
-    <div class="today19">Hôm nay là <b>${dayLbl20(td)}</b> <button class="chip19" id="th19" type="button">🎨 Theme</button></div></div>
+  return `<div class="hero19 tx21"><div class="hl"><div class="hellorow"><div id="hello19">${helloSvg()}</div></div>
+    <div class="today19">Hôm nay là <b>${dayLbl20(td)}</b> <button class="chip19" id="th19" type="button">🎨 Theme</button>${window.MECHIPS21 ? MECHIPS21() : ''}</div></div>
     <div class="pay19 tright20"><div class="herostats">${right}</div></div></div>`;
 }
 const WDN20 = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
@@ -810,6 +810,317 @@ document.addEventListener('change', (e) => {
   if (e.target.id === 'tcE') { TC.e = e.target.value; keepY(render); }
   if (e.target.id === 'tcF') { TC.first = e.target.checked; $('#tcR').innerHTML = tcCalc(); }
 });
+
+// =====================================================================
+// v21.2: Gen Z (trẻ trung, sticker, neo-brutal) · (Đô thị đã bỏ ở v21.7)
+// =====================================================================
+THEMES.push(['genz', 'Gen Z']);
+TSTYLE.genz = 'tag';
+const SPARK = (c, s = 1) => `<path transform="scale(${s})" d="M12 0 C13 7 17 11 24 12 C17 13 13 17 12 24 C11 17 7 13 0 12 C7 11 11 7 12 0Z" fill="${c}"/>`;
+TICON.genz = `<svg viewBox="0 0 24 24">${SPARK('#7c5cff')}</svg>`;
+PARTS.genz = () => [`<svg viewBox="0 0 24 24">${SPARK('#7c5cff')}</svg>`, `<svg viewBox="0 0 24 24">${SPARK('#ff5fa2')}</svg>`, `<svg viewBox="0 0 24 24">${SPARK('#39d0ff')}</svg>`, '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="#d4ff3a" stroke="#1b1340" stroke-width="1.5"/></svg>'];
+
+// ---------- Gen Z pieces ----------
+const INK = '#1b1340';
+const smiley = (x, y, r, rot = 0) => `<g transform="translate(${x} ${y}) rotate(${rot})"><circle r="${r}" fill="#ffd84d" stroke="${INK}" stroke-width="2.4"/><circle cx="${-r * .33}" cy="${-r * .2}" r="${r * .11}" fill="${INK}"/><circle cx="${r * .33}" cy="${-r * .2}" r="${r * .11}" fill="${INK}"/><path d="M${-r * .45} ${r * .18} Q0 ${r * .65} ${r * .45} ${r * .18}" stroke="${INK}" stroke-width="2.4" fill="none" stroke-linecap="round"/></g>`;
+const heart = (x, y, s, c = '#ff5fa2', rot = 0) => `<g transform="translate(${x} ${y}) rotate(${rot}) scale(${s})"><path d="M0 6 C-10 -2 -8 -12 0 -7 C8 -12 10 -2 0 6Z" fill="${c}" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/></g>`;
+const bolt = (x, y, s, rot = 0) => `<g transform="translate(${x} ${y}) rotate(${rot}) scale(${s})"><path d="M2 -14 L-8 2 H0 L-3 14 L9 -3 H1Z" fill="#39d0ff" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/></g>`;
+const bubble = (x, y, txt, c, rot = 0) => { const w = txt.length * 8.4 + 22; return `<g transform="translate(${x} ${y}) rotate(${rot})"><rect x="3" y="3" width="${w}" height="30" rx="15" fill="${INK}"/><rect width="${w}" height="30" rx="15" fill="${c}" stroke="${INK}" stroke-width="2"/><path d="M14 28 L10 38 L24 29" fill="${c}" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/><text x="${w / 2}" y="16" text-anchor="middle" dominant-baseline="central" font-family="'Bricolage Grotesque', 'Segoe UI', sans-serif" font-weight="800" font-size="14" fill="${INK}">${txt}</text></g>`; };
+HELLO.genz = (txt) => {
+  const fs = 40; _cv.font = `800 ${fs}px 'Bricolage Grotesque', 'Segoe UI', sans-serif`; const t = Math.max(_cv.measureText(txt).width, 150);
+  const W = Math.round(t + 300), H = 270, bx = 34, by = 92, bw = t + 56, bh = 74;
+  let checks = ''; for (let i = 0; i < Math.ceil(W / 14); i++) checks += `<rect x="${i * 14}" y="${H - 22 + (i % 2) * 7}" width="7" height="7" fill="${INK}"/><rect x="${i * 14 + 7}" y="${H - 22 + ((i + 1) % 2) * 7}" width="7" height="7" fill="${INK}"/>`;
+  return svgS(W, H, `<defs><pattern id="gz21d" width="16" height="16" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.2" fill="#cfc6ef"/></pattern></defs>
+    <rect x="6" y="10" width="${W - 12}" height="${H - 40}" rx="28" fill="url(#gz21d)"/>
+    <path d="M${W - 250} 40 c20 -18 40 18 60 0 s40 18 60 0 s40 18 60 0" stroke="#ff5fa2" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <circle cx="${W - 70}" cy="182" r="34" fill="#c9b8ff" stroke="${INK}" stroke-width="2.4"/><circle cx="${W - 70}" cy="182" r="34" fill="url(#gz21d)"/>
+    <g class="bob21" style="animation-delay:-.4s">${smiley(W - 76, 92, 32, -12)}</g>
+    <g class="bob21" style="animation-delay:-1.4s">${bubble(W - 196, 150, 'no cap', '#d4ff3a', -6)}</g>
+    <g class="bob21" style="animation-delay:-2.1s">${heart(W - 150, 66, 1.5, '#ff5fa2', 14)}</g>
+    <g class="bob21" style="animation-delay:-.9s">${bolt(W - 30, 186, 1.6, 16)}</g>
+    <g class="spk21">${['#7c5cff', '#ff5fa2', '#39d0ff', '#7c5cff'].map((c, i) => `<g transform="translate(${[bx - 18, bx + bw - 6, W - 120, bx + bw * .55][i]} ${[70, 186, 214, 30][i]}) scale(${[.9, .7, .8, .55][i]})" class="tw21" style="animation-delay:-${i * .5}s"><g transform="translate(-12 -12)">${SPARK(c)}</g></g>`).join('')}</g>
+    <g transform="rotate(-3 ${bx + bw / 2} ${by + bh / 2})"><rect x="${bx + 7}" y="${by + 7}" width="${bw}" height="${bh}" rx="18" fill="${INK}"/><rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="18" fill="#d4ff3a" stroke="${INK}" stroke-width="3"/>
+      <text x="${bx + bw / 2}" y="${by + bh / 2 + 1}" text-anchor="middle" dominant-baseline="central" font-family="'Bricolage Grotesque', 'Segoe UI', sans-serif" font-weight="800" font-size="${fs}" fill="${INK}" letter-spacing="-1">${esc(txt)}</text></g>
+    <g transform="translate(${bx + 10} ${by + bh + 26}) rotate(4)"><rect x="3" y="3" width="150" height="28" rx="6" fill="${INK}"/><rect width="150" height="28" rx="6" fill="#fff" stroke="${INK}" stroke-width="2"/><text x="75" y="15" text-anchor="middle" dominant-baseline="central" font-family="'Bricolage Grotesque', 'Segoe UI', sans-serif" font-weight="700" font-size="13" fill="#7c5cff">tax season era ✦</text></g>
+    ${checks}`);
+};
+SCENE.genz = `<svg viewBox="0 0 520 90" preserveAspectRatio="xMaxYMax meet"><rect x="250" y="22" width="190" height="46" rx="14" fill="${INK}" transform="translate(5 5)"/><rect x="250" y="22" width="190" height="46" rx="14" fill="#d4ff3a" stroke="${INK}" stroke-width="2.5"/><text x="345" y="46" text-anchor="middle" dominant-baseline="central" font-family="'Bricolage Grotesque', sans-serif" font-weight="800" font-size="22" fill="${INK}">hello bestie</text>${smiley(478, 40, 22, -10)}${heart(215, 30, 1.3)}<g transform="translate(206 62) scale(.8)">${SPARK('#7c5cff')}</g></svg>`;
+
+// ---------- menu band + page decor for the 2 new themes ----------
+const _band21 = band20;
+band20 = function (k) {
+  _band21(k); const mb = $('.menubar'); if (!mb || k !== 'genz') return;
+  const b = document.createElement('div'); b.className = 'band20 b-' + k; b.setAttribute('aria-hidden', 'true');
+  if (k === 'genz') { const s = ['tax season era', 'no cap', 'W-2 check', 'slay the paperwork', 'main character energy', 'refund loading…', 'it’s giving organized', 'bestie, sign here'];
+    const one = s.map((w) => `<span>${w}</span><i>${TICON.genz}</i>`).join(''); b.innerHTML = `<div class="mq21"><div class="mqin21">${one}${one}</div></div>`; }
+  mb.appendChild(b);
+};
+const _applyTheme21 = V19.applyTheme;
+V19.applyTheme = function () { _applyTheme21(); const k = THEME; if (k === 'genz' && $('.menubar') && !$('.menubar .band20')) band20(k); };
+const _decor212 = decor20;
+decor20 = function (k) {
+  _decor212(k); if (!MOTION || PHONE) return;
+  if (k === 'genz') document.body.insertAdjacentHTML('beforeend', [[2, 30, 'smile'], [3, 64, 'heart'], [96, 40, 'bolt'], [95, 76, 'spark']].map(([l, tp, w], i) => `<span class="dc20 stk21" style="left:${l}vw;top:${tp}vh;animation-delay:-${i * 1.3}s"><svg viewBox="-40 -40 80 80" width="64" height="64" overflow="visible">${w === 'smile' ? smiley(0, 0, 26, -12) : w === 'heart' ? heart(0, 0, 2.4, '#ff5fa2', 12) : w === 'bolt' ? bolt(0, 0, 2.2, 14) : `<g transform="translate(-24 -24) scale(2)">${SPARK('#7c5cff')}</g>`}</svg></span>`).join(''));
+};
+
+// =====================================================================
+// v21.4/5: 10 theme (bỏ Y2K / Road Trip / Chinese / Aquarium) · thêm Thần đồng toán học + Universe · Zodiac + Aquarium vẽ lại
+//        Quick reading (cung hoàng đạo / tuổi con giáp) thay "Bảng dán giấy" + "Trưa nay ăn gì"
+//        Theme picker: bỏ chọn tab tên (mỗi theme 1 kiểu) + bỏ món ăn vặt
+// =====================================================================
+THEMES.length = 0;
+[['autumn', 'Mùa thu'], ['cruise', 'Cruising'], ['bloom', 'Flowers'], ['pro', 'Professional'], ['genz', 'Gen-Z 1'], ['groovy', 'Gen-Z 2'], ['zodiac', 'Zodiac'], ['math', 'Thần đồng toán học'], ['universe', 'Universe']].forEach((t) => THEMES.push(t));
+tabStyle = () => 'tag'; // v21.4: name tags always follow the theme
+const tw21 = (txt, font) => { _cv.font = font; return Math.max(_cv.measureText(txt).width, 150); };
+const S4 = (x, y, s, c, cls = '') => `<g class="${cls}"><g transform="translate(${x} ${y}) scale(${s})"><path d="M0 -12 C1 -4 4 -1 12 0 C4 1 1 4 0 12 C-1 4 -4 1 -12 0 C-4 -1 -1 -4 0 -12Z" fill="${c}"/></g></g>`; // animation class on the outer <g>, SVG transform on the inner one
+const fadeMask = (id, W, H) => `<linearGradient id="${id}g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".05" stop-color="#fff"/><stop offset=".95" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient><mask id="${id}" maskUnits="userSpaceOnUse"><rect width="${W}" height="${H}" fill="url(#${id}g)"/></mask>`;
+
+// ---------- cung hoàng đạo ----------
+const ZOD21 = { aries: ['♈', 'Bạch Dương', '21/3–19/4'], taurus: ['♉', 'Kim Ngưu', '20/4–20/5'], gemini: ['♊', 'Song Tử', '21/5–20/6'], cancer: ['♋', 'Cự Giải', '21/6–22/7'], leo: ['♌', 'Sư Tử', '23/7–22/8'], virgo: ['♍', 'Xử Nữ', '23/8–22/9'],
+  libra: ['♎', 'Thiên Bình', '23/9–22/10'], scorpio: ['♏', 'Bọ Cạp', '23/10–21/11'], sagittarius: ['♐', 'Nhân Mã', '22/11–21/12'], capricorn: ['♑', 'Ma Kết', '22/12–19/1'], aquarius: ['♒', 'Bảo Bình', '20/1–18/2'], pisces: ['♓', 'Song Ngư', '19/2–20/3'] };
+const CONST21 = { // constellation lines (0..100 box)
+  aries: [[[5, 45], [35, 30], [60, 34], [85, 55]]], taurus: [[[5, 15], [30, 40], [50, 50], [70, 40], [92, 12]], [[50, 50], [58, 72], [75, 88]]],
+  gemini: [[[20, 10], [22, 50], [25, 90]], [[60, 8], [62, 48], [66, 88]], [[22, 30], [62, 28]]], cancer: [[[50, 10], [50, 45], [20, 85]], [[50, 45], [82, 80]]],
+  leo: [[[85, 22], [70, 10], [55, 18], [58, 35], [75, 40], [60, 60], [30, 62], [10, 80]], [[60, 60], [40, 86]]], virgo: [[[8, 20], [30, 35], [50, 30], [70, 45], [92, 40]], [[50, 30], [55, 60], [40, 86]], [[70, 45], [78, 75]]],
+  libra: [[[50, 10], [20, 40], [80, 40], [50, 10]], [[20, 40], [15, 78]], [[80, 40], [85, 78]]], scorpio: [[[5, 20], [20, 30], [35, 35], [50, 45], [60, 60], [62, 78], [75, 88], [90, 80]]],
+  sagittarius: [[[10, 86], [35, 60], [55, 50], [75, 30], [90, 14]], [[55, 50], [50, 25], [75, 30]], [[35, 60], [55, 76]]], capricorn: [[[10, 20], [40, 30], [88, 25], [70, 70], [40, 80], [10, 20]]],
+  aquarius: [[[5, 30], [25, 45], [45, 30], [65, 45], [85, 30]], [[15, 65], [35, 80], [55, 65], [75, 80], [95, 65]]], pisces: [[[10, 80], [30, 55], [50, 45], [70, 20], [85, 10]], [[50, 45], [75, 60], [95, 70]]] };
+window.MECHIPS21 = () => { const z = ZOD21[S.me && S.me.zodiac];
+  return `<span class="mec21">${z ? `<span class="zc21" data-mec21 title="${z[2]}"><b>${z[0]}︎</b>${z[1]}</span>` : '<span class="zc21 em" data-mec21>✦ chọn cung</span>'}</span>`; };
+
+// ---------- Quick reading (thay Bảng dán giấy + Trưa nay ăn gì) ----------
+// v21.6: chỉ cung hoàng đạo, tử vi thật tiếng Anh (Free Horoscope API, server lấy mỗi sáng, cache DB). Không link, chỉ đọc.
+const HORO21 = {};
+function horo21(key) {
+  const c = HORO21[key]; if (c && c.day === todayISO()) return c.v; if (c && c.loading) return null;
+  const done = (v) => { HORO21[key] = { day: todayISO(), v }; const p = $('#pulse19'); if (p) { p.innerHTML = pulseInner(); bindPulse(); } };
+  HORO21[key] = { loading: true }; api('GET', '/horoscope?sign=' + key).then(done).catch(() => done({ text: '' }));
+  return null;
+}
+function readingCard21() {
+  const z = S.me && S.me.zodiac;
+  if (!z || !ZOD21[z]) return `<div class="pc19 rd21"><h3>Quick reading hôm nay</h3><div class="rde21"><div class="rdi21">${Object.values(ZOD21).slice(0, 6).map((x) => `<b>${x[0]}︎</b>`).join('')}</div><p>Chọn cung hoàng đạo để xem tử vi mỗi ngày.</p><button class="btn pri" data-mec21>Chọn cung hoàng đạo</button></div></div>`;
+  const d = new Date(todayISO() + 'T12:00:00Z'), dl = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][d.getUTCDay()] + ', ' + md(todayISO());
+  const R = horo21(z);
+  const body = !R ? '<div class="rdq21 ld">Đang lấy tử vi hôm nay…</div>' : R.text ? `<blockquote class="rdq21">${esc(R.text)}</blockquote>` : '<div class="rdq21 ld">Chưa lấy được tử vi hôm nay, lát nữa mở lại nhé.</div>';
+  return `<div class="pc19 rd21"><h3>Quick reading hôm nay</h3><div class="rdh21"><span class="rdg21">${ZOD21[z][0]}︎</span><div><b>${ZOD21[z][1]}</b><small>${ZOD21[z][2]} · ${dl}</small></div></div>${body}<div class="rdf21"><span class="src">Free Horoscope API</span></div></div>`;
+}
+const _pulseInner214 = pulseInner;
+pulseInner = function () { const h = _pulseInner214(); const i = h.indexOf('<div class="pc19">'); return (i > 0 ? h.slice(0, i) : h) + readingCard21(); };
+const _pulseHtml214 = pulseHtml;
+pulseHtml = function () { return _pulseHtml214().replace('class="pulse19"', 'class="pulse19 r21"'); };
+document.addEventListener('click', (e) => { if (e.target.closest('[data-mec21]')) openTheme(); });
+
+// ---------- Gen-Z 2 · Groovy (70s) ----------
+const daisy21 = (x, y, s, face = true, cls = '') => `<g class="${cls}"><g transform="translate(${x} ${y}) scale(${s})">${[0, 40, 80, 120, 160, 200, 240, 280, 320].map((a) => `<ellipse cx="0" cy="-13" rx="6" ry="10" fill="#fff4e0" stroke="#7a4a2a" stroke-width="2" transform="rotate(${a})"/>`).join('')}<circle r="10" fill="#f2b134" stroke="#7a4a2a" stroke-width="2"/>${face ? '<circle cx="-3.5" cy="-2" r="1.4" fill="#7a4a2a"/><circle cx="3.5" cy="-2" r="1.4" fill="#7a4a2a"/><path d="M-4 3 q4 4 8 0" stroke="#7a4a2a" stroke-width="1.6" fill="none" stroke-linecap="round"/>' : ''}</g></g>`;
+HELLO.groovy = (txt) => {
+  const fs = 44, t = tw21(txt, `400 ${fs}px Pacifico, cursive`), R = t / 2 + 70, cx = R + 14, W = Math.round(cx + R + 150), H = 270, cy = 224;
+  const arcs = ['#7a4a2a', '#c4532f', '#ef6f3c', '#f2b134', '#9bb07a'].map((c, i) => { const r = R - i * 20; return `<path d="M${cx - r} ${cy} A${r} ${r} 0 0 1 ${cx + r} ${cy}" stroke="${c}" stroke-width="20" fill="none"/>`; }).join('');
+  return svgS(W, H, `${arcs}<rect x="0" y="${cy}" width="${W}" height="${H - cy}" fill="#fff4e0"/><path d="M0 ${cy + 2} ${Array.from({ length: Math.ceil(W / 40) + 1 }, () => 'q10 -8 20 0 t20 0').join(' ')}" stroke="#ef6f3c" stroke-width="3" fill="none"/>
+    <text x="${cx}" y="${cy - 60}" text-anchor="middle" dominant-baseline="central" font-family="Pacifico, cursive" font-size="${fs}" fill="#fff4e0" stroke="#7a4a2a" stroke-width="6" paint-order="stroke">${esc(txt)}</text>
+    ${daisy21(W - 70, 80, 1.6, true, 'bob21')}${daisy21(W - 150, 190, 1, true, 'bob21')}${daisy21(W - 40, 200, .8, false, 'bob21')}${daisy21(26, 50, .8, false, 'bob21')}
+    <text x="${cx}" y="${cy + 22}" text-anchor="middle" font-family="Nunito, sans-serif" font-weight="800" font-size="13" fill="#7a4a2a" letter-spacing="3">PEACE · LOVE · REFUNDS</text>`);
+};
+SCENE.groovy = `<svg viewBox="0 0 520 90" preserveAspectRatio="xMaxYMax meet">${['#7a4a2a', '#c4532f', '#ef6f3c', '#f2b134', '#9bb07a'].map((c, i) => `<path d="M${250 + i * 12} 90 A${110 - i * 12} ${110 - i * 12} 0 0 1 ${470 - i * 12} 90" stroke="${c}" stroke-width="11" fill="none"/>`).join('')}<text x="360" y="72" text-anchor="middle" font-family="Pacifico, cursive" font-size="22" fill="#fff4e0" stroke="#7a4a2a" stroke-width="4" paint-order="stroke">groovy</text>${daisy21(214, 40, .9)}${daisy21(496, 30, .7)}</svg>`;
+TICON.groovy = `<svg viewBox="-24 -24 48 48">${daisy21(0, 0, 1, false)}</svg>`;
+PARTS.groovy = () => [`<svg viewBox="-24 -24 48 48">${daisy21(0, 0, 1, false)}</svg>`];
+
+// ---------- Zodiac (vẽ lại: tinh vân, vòng 12 cung, chòm sao của bạn, sao băng) ----------
+function constellation21(k, x, y, s, gold = '#ffe08a') {
+  const L = CONST21[k] || CONST21.leo; const pts = new Map();
+  const lines = L.map((pl) => { pl.forEach((p) => pts.set(p.join(','), p)); return `<polyline points="${pl.map(([a, b]) => `${(a * s).toFixed(1)},${(b * s).toFixed(1)}`).join(' ')}" fill="none" stroke="${gold}" stroke-width="1.2" opacity=".75"/>`; }).join('');
+  const stars = [...pts.values()].map(([a, b], i) => `<circle class="${i % 2 ? 'tw21' : ''}" style="animation-delay:-${i * .4}s" cx="${(a * s).toFixed(1)}" cy="${(b * s).toFixed(1)}" r="${i % 3 ? 2.4 : 3.4}" fill="#fff8e1" filter="url(#zgl21)"/>`).join('');
+  return `<g transform="translate(${x} ${y})">${lines}${stars}</g>`;
+}
+HELLO.zodiac = (txt) => {
+  const fs = 40, t = tw21(txt, `italic 600 ${fs}px Georgia, serif`), W = Math.round(t + 330), H = 280, z = (S.me && S.me.zodiac) || '', Z = ZOD21[z], wx = W - 132, wy = 140;
+  let stars = ''; const r = rnd(7); for (let i = 0; i < 70; i++) stars += `<circle class="${i % 3 ? '' : 'tw21'}" style="animation-delay:-${(r() * 3).toFixed(1)}s" cx="${(r() * W).toFixed(0)}" cy="${(r() * H).toFixed(0)}" r="${(r() * 1.3 + .3).toFixed(1)}" fill="#fff6d8" opacity="${(.35 + r() * .65).toFixed(2)}"/>`;
+  const keys = Object.keys(ZOD21);
+  const ticks = Array.from({ length: 72 }, (_, i) => { const a = i * 5 * Math.PI / 180, r1 = i % 6 ? 104 : 100; return `<path d="M${(Math.cos(a) * r1).toFixed(1)} ${(Math.sin(a) * r1).toFixed(1)} L${(Math.cos(a) * 108).toFixed(1)} ${(Math.sin(a) * 108).toFixed(1)}" stroke="#e8c46a" stroke-width=".8" opacity=".6"/>`; }).join('');
+  const wheel = keys.map((k, i) => { const a = (i * 30 - 90) * Math.PI / 180, on = z === k; return `<text x="${(Math.cos(a) * 86).toFixed(1)}" y="${(Math.sin(a) * 86).toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="${on ? 21 : 14}" fill="${on ? '#ffe08a' : '#a99cf0'}" ${on ? 'filter="url(#zgl21)"' : ''}>${ZOD21[k][0]}︎</text>`; }).join('');
+  return svgS(W, H, `<defs><radialGradient id="zd21" cx=".75" cy=".35" r="1"><stop offset="0" stop-color="#363d8f"/><stop offset=".6" stop-color="#1b2152"/><stop offset="1" stop-color="#11153a"/></radialGradient>
+      <radialGradient id="zn21a"><stop offset="0" stop-color="#c77dff" stop-opacity=".55"/><stop offset="1" stop-color="#c77dff" stop-opacity="0"/></radialGradient><radialGradient id="zn21b"><stop offset="0" stop-color="#4cc9f0" stop-opacity=".4"/><stop offset="1" stop-color="#4cc9f0" stop-opacity="0"/></radialGradient>
+      <filter id="zgl21" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="1.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      <clipPath id="zc21"><rect x="4" y="4" width="${W - 8}" height="${H - 8}" rx="28"/></clipPath></defs>
+    <g clip-path="url(#zc21)"><rect width="${W}" height="${H}" fill="url(#zd21)"/><ellipse cx="${W * .3}" cy="${H * .8}" rx="${W * .35}" ry="90" fill="url(#zn21a)"/><ellipse cx="${W * .75}" cy="${H * .2}" rx="170" ry="80" fill="url(#zn21b)"/>${stars}
+      <g class="shoot21"><path d="M0 0 L-70 -24" stroke="url(#zsh21)" stroke-width="2" stroke-linecap="round"/><circle r="2.2" fill="#fff"/></g>
+      <linearGradient id="zsh21" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+      <g transform="translate(${wx} ${wy})"><circle r="112" fill="#0f1336" opacity=".35"/>${ticks}<circle r="98" fill="none" stroke="#e8c46a" stroke-width="1" opacity=".55"/><circle r="70" fill="none" stroke="#e8c46a" stroke-width="1" opacity=".45"/>
+        <g class="spin21">${keys.map((_, i) => { const a = (i * 30 - 75) * Math.PI / 180; return `<path d="M${(Math.cos(a) * 70).toFixed(1)} ${(Math.sin(a) * 70).toFixed(1)} L${(Math.cos(a) * 98).toFixed(1)} ${(Math.sin(a) * 98).toFixed(1)}" stroke="#e8c46a" stroke-width=".8" opacity=".45"/>`; }).join('')}${wheel}</g>
+        <circle r="62" fill="#161b46" stroke="#e8c46a" stroke-width="1.4"/>${constellation21(z || 'leo', -40, -40, .8)}</g>
+      <g transform="translate(${W - 34} 34)"><circle r="18" fill="#ffe08a" opacity=".15"/><circle r="12" fill="#ffe08a"/><circle cx="5" cy="-4" r="11" fill="#1b2152"/></g></g>
+    <text x="${44 + t / 2}" y="100" text-anchor="middle" dominant-baseline="central" font-family="Georgia, serif" font-style="italic" font-weight="600" font-size="${fs}" fill="#ffe08a" filter="url(#zgl21)">${esc(txt)}</text>
+    <path d="M${44 + t * .15} 130 H${44 + t * .85}" stroke="#e8c46a" stroke-width="1" opacity=".55"/><g transform="translate(${44 + t / 2} 130)">${S4(0, 0, .45, '#ffe08a')}</g>
+    <text x="${44 + t / 2}" y="160" text-anchor="middle" dominant-baseline="central" font-family="Georgia, serif" font-size="19" fill="#e4dbff">${Z ? `${Z[0]}︎ ${Z[1]}` : '✦ chọn cung trong Theme ✦'}</text>
+    <text x="${44 + t / 2}" y="186" text-anchor="middle" dominant-baseline="central" font-family="Nunito, sans-serif" font-size="12" fill="#a99cf0" letter-spacing="2">${Z ? Z[2] : ''}</text>`);
+};
+SCENE.zodiac = `<svg viewBox="0 0 520 90" preserveAspectRatio="xMaxYMax meet"><defs><filter id="zgl21" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="1.2"/></filter></defs><rect x="180" y="4" width="336" height="82" rx="18" fill="#1b2152"/>${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((i) => `<text x="${206 + i * 26}" y="58" text-anchor="middle" font-size="15" fill="${i === 4 ? '#ffe08a' : '#a99cf0'}">${Object.values(ZOD21)[i][0]}︎</text>`).join('')}<polyline points="220,30 240,20 262,26 284,16" stroke="#ffe08a" fill="none" stroke-width="1"/><circle cx="490" cy="24" r="9" fill="#ffe08a"/><circle cx="495" cy="20" r="8.5" fill="#1b2152"/></svg>`;
+TICON.zodiac = '<svg viewBox="0 0 24 24"><path d="M15 3 A9 9 0 1 0 21 15 A7 7 0 1 1 15 3Z" fill="#e8c46a"/><path d="M8 6 l.6 1.4 1.4.6-1.4.6L8 10l-.6-1.4L6 8l1.4-.6Z" fill="#7a6cf0"/></svg>';
+PARTS.zodiac = () => [`<svg viewBox="-12 -12 24 24">${S4(0, 0, 1, '#e8c46a')}</svg>`, `<svg viewBox="-12 -12 24 24">${S4(0, 0, .7, '#b9a8ff')}</svg>`];
+
+// ---------- Thần đồng toán học (bảng đen, phấn, công thức, thước, compa) ----------
+const MSYM = ['π', '∑', '√', '∞', '∫', '%', 'Δ', 'x²', '÷', '≈'];
+HELLO.math = (txt) => {
+  const fs = 40, t = tw21(txt, `400 ${fs}px 'Gloria Hallelujah', cursive`), W = Math.round(t + 330), H = 280, bw = W - 20;
+  const chalk = (x, y, rot, txt2, o = .8, sz = 16) => `<text x="${x}" y="${y}" transform="rotate(${rot} ${x} ${y})" font-family="'Gloria Hallelujah', cursive" font-size="${sz}" fill="#f4f1e6" opacity="${o}">${txt2}</text>`;
+  return svgS(W, H, `<defs><linearGradient id="mb21" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2f5d50"/><stop offset="1" stop-color="#244a40"/></linearGradient><pattern id="md21" width="8" height="8" patternUnits="userSpaceOnUse"><circle cx="2" cy="3" r=".6" fill="#fff" opacity=".07"/></pattern></defs>
+    <rect x="6" y="8" width="${bw}" height="222" rx="6" fill="#9a6b43"/><rect x="18" y="20" width="${bw - 24}" height="198" rx="3" fill="url(#mb21)"/><rect x="18" y="20" width="${bw - 24}" height="198" fill="url(#md21)"/>
+    <path d="M40 200 q${bw * .2} -8 ${bw * .4} -2" stroke="#f4f1e6" stroke-width="10" opacity=".05" stroke-linecap="round"/>
+    <text x="${40 + t / 2}" y="98" text-anchor="middle" dominant-baseline="central" font-family="'Gloria Hallelujah', cursive" font-size="${fs}" fill="#fbfaf3">${esc(txt)}</text>
+    <path d="M${40} 128 q${t * .5} 8 ${t} -2" stroke="#f2c94c" stroke-width="2.4" fill="none" stroke-linecap="round" opacity=".9"/>
+    ${chalk(44, 60, -3, '∫ W-2 dx = refund ✓', .85, 15)}${chalk(46, 172, 2, 'e<tspan baseline-shift="super" font-size="11">iπ</tspan> + 1 = 0', .8, 17)}${chalk(44 + t * .55, 182, -2, 'a² + b² = c²', .75, 15)}
+    ${chalk(W - 210, 56, 4, '1040 + 1099', .8, 15)}${chalk(W - 206, 78, 4, '≈ $$$', .8, 15)}
+    <g transform="translate(${W - 130} 140)" stroke="#f4f1e6" stroke-width="1.8" fill="none" opacity=".85"><path d="M-50 40 L30 40 L-50 -26Z"/><path d="M-40 40 v-10 h10"/>${chalk(-70, 10, 0, 'a', .8, 13)}${chalk(-14, 58, 0, 'b', .8, 13)}${chalk(-2, 0, 0, 'c', .8, 13)}<circle cx="70" cy="-10" r="24"/><path d="M70 -10 L92 -18"/>${chalk(74, -20, 0, 'r', .8, 12)}</g>
+    <g class="bob21" style="animation-delay:-1.5s"><g transform="translate(${W - 60} 44) rotate(18)"><path d="M0 0 L-12 52 M0 0 L12 52" stroke="#c9cfd6" stroke-width="3" stroke-linecap="round"/><circle r="5" fill="#e5484d"/><path d="M12 52 l-2 8" stroke="#555" stroke-width="2"/></g></g>
+    <rect x="10" y="230" width="${bw - 8}" height="10" rx="2" fill="#7a5233"/>
+    <rect x="${W * .3}" y="223" width="34" height="9" rx="2" fill="#f4f1e6"/><rect x="${W * .3 + 44}" y="225" width="22" height="7" rx="2" fill="#f2c94c"/><rect x="${W * .3 + 76}" y="225" width="18" height="7" rx="2" fill="#ec7fa9"/>
+    <g transform="translate(${W * .62} 214)"><rect width="46" height="16" rx="3" fill="#3d85c6"/><rect y="11" width="46" height="5" rx="2" fill="#2b2b2b"/></g>
+    <g transform="translate(30 250)">${Array.from({ length: Math.floor((W - 60) / 10) }, (_, i) => `<path d="M${i * 10} 0 v${i % 5 ? 6 : 11}" stroke="#7a6a3a" stroke-width="1"/>`).join('')}<rect x="-6" y="-4" width="${W - 48}" height="20" rx="3" fill="#f2d478" opacity=".55"/></g>`);
+};
+SCENE.math = `<svg viewBox="0 0 520 90" preserveAspectRatio="xMaxYMax meet"><rect x="190" y="6" width="320" height="76" rx="4" fill="#9a6b43"/><rect x="198" y="12" width="304" height="62" fill="#2f5d50"/><text x="350" y="40" text-anchor="middle" dominant-baseline="central" font-family="'Gloria Hallelujah', cursive" font-size="20" fill="#fbfaf3">π ≈ 3.14 ✓</text><text x="230" y="64" font-family="'Gloria Hallelujah', cursive" font-size="12" fill="#f4f1e6" opacity=".8">a²+b²=c²</text><text x="420" y="64" font-family="'Gloria Hallelujah', cursive" font-size="12" fill="#f2c94c">∑ refund</text></svg>`;
+TICON.math = '<svg viewBox="0 0 24 24"><text x="12" y="13" text-anchor="middle" dominant-baseline="central" font-family="Georgia, serif" font-size="20" font-weight="700" fill="#2f5d50">π</text></svg>';
+PARTS.math = () => MSYM.map((c, i) => `<svg viewBox="0 0 24 24"><text x="12" y="13" text-anchor="middle" dominant-baseline="central" font-family="Georgia, serif" font-size="18" font-weight="700" fill="${['#2f5d50', '#3d85c6', '#e5484d', '#c9a227'][i % 4]}">${c}</text></svg>`);
+
+// ---------- Universe (vũ trụ: tinh vân, hành tinh có vành, tên lửa, sao chổi) ----------
+const planet21 = (x, y, r, a, b, ring = false, cls = '') => `<g class="${cls}"><g transform="translate(${x} ${y})">${ring ? `<ellipse rx="${r * 1.9}" ry="${r * .45}" fill="none" stroke="#f3d7a1" stroke-width="${r * .18}" opacity=".85" transform="rotate(-18)" stroke-dasharray="${r * 3} ${r * 9}" stroke-dashoffset="${r * 3}"/>` : ''}<defs><radialGradient id="pl${x | 0}${y | 0}" cx=".35" cy=".35"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></radialGradient></defs><circle r="${r}" fill="url(#pl${x | 0}${y | 0})"/><path d="M${-r * .8} ${-r * .2} q${r * .8} ${r * .25} ${r * 1.6} 0" stroke="#fff" stroke-width="${r * .08}" fill="none" opacity=".25"/>${ring ? `<ellipse rx="${r * 1.9}" ry="${r * .45}" fill="none" stroke="#f3d7a1" stroke-width="${r * .18}" opacity=".85" transform="rotate(-18)" stroke-dasharray="${r * 6} ${r * 6}"/>` : ''}</g></g>`;
+const rocket21 = (x, y, s) => `<g transform="translate(${x} ${y}) scale(${s}) rotate(45)"><path d="M0 -26 C10 -16 10 8 6 16 H-6 C-10 8 -10 -16 0 -26Z" fill="#f4f6fb" stroke="#3b3f6b" stroke-width="1.6"/><circle cy="-8" r="4.6" fill="#4cc9f0" stroke="#3b3f6b" stroke-width="1.4"/><path d="M-6 6 L-14 18 L-6 15Z M6 6 L14 18 L6 15Z" fill="#ff5d73" stroke="#3b3f6b" stroke-width="1.4"/><path class="flm21" d="M-4 16 Q0 32 4 16Z" fill="#ffb84d"/></g>`;
+HELLO.universe = (txt) => {
+  const fs = 42, t = tw21(txt, `800 ${fs}px Montserrat, sans-serif`), W = Math.round(t + 330), H = 280;
+  let stars = ''; const r = rnd(11); for (let i = 0; i < 90; i++) stars += `<circle class="${i % 4 ? '' : 'tw21'}" style="animation-delay:-${(r() * 3).toFixed(1)}s" cx="${(r() * W).toFixed(0)}" cy="${(r() * H).toFixed(0)}" r="${(r() * 1.3 + .3).toFixed(1)}" fill="${i % 7 ? '#fff' : '#9fe8ff'}" opacity="${(.4 + r() * .6).toFixed(2)}"/>`;
+  return svgS(W, H, `<defs><linearGradient id="un21" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b0f2e"/><stop offset=".6" stop-color="#1c1150"/><stop offset="1" stop-color="#3a1260"/></linearGradient>
+      <radialGradient id="unb21"><stop offset="0" stop-color="#ff5fa2" stop-opacity=".5"/><stop offset="1" stop-color="#ff5fa2" stop-opacity="0"/></radialGradient><radialGradient id="unc21"><stop offset="0" stop-color="#4cc9f0" stop-opacity=".45"/><stop offset="1" stop-color="#4cc9f0" stop-opacity="0"/></radialGradient>
+      <linearGradient id="unt21" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffffff"/><stop offset=".5" stop-color="#9fe8ff"/><stop offset="1" stop-color="#d7b8ff"/></linearGradient>
+      <filter id="ungl21" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><clipPath id="unk21"><rect x="4" y="4" width="${W - 8}" height="${H - 8}" rx="28"/></clipPath>
+      <linearGradient id="unsh21" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#9fe8ff" stop-opacity="0"/></linearGradient></defs>
+    <g clip-path="url(#unk21)"><rect width="${W}" height="${H}" fill="url(#un21)"/><ellipse cx="${W * .25}" cy="${H * .75}" rx="${W * .3}" ry="90" fill="url(#unb21)"/><ellipse cx="${W * .7}" cy="${H * .3}" rx="200" ry="100" fill="url(#unc21)"/>${stars}
+      <g transform="translate(${W * .55} ${H * .78})" opacity=".55">${[0, 1, 2, 3].map((i) => `<path d="M0 0 C${30 + i * 18} ${-10 - i * 6} ${50 + i * 20} ${20 + i * 10} 0 ${40 + i * 12}" stroke="#d7b8ff" stroke-width="1" fill="none" transform="rotate(${i * 90})"/>`).join('')}<circle r="4" fill="#fff"/></g>
+      ${planet21(W - 110, 92, 38, '#ffd59e', '#e0884a', true, 'bob21')}${planet21(W - 40, 210, 18, '#9fe8ff', '#3a6fd8', false, 'bob21')}${planet21(54, 230, 12, '#d7b8ff', '#7b4ee0')}
+      <g class="shoot21"><path d="M0 0 L-80 -26" stroke="url(#unsh21)" stroke-width="2.4" stroke-linecap="round"/><circle r="2.6" fill="#fff"/></g>
+      <g class="fly21">${rocket21(0, 0, 1)}</g></g>
+    <text x="${40 + t / 2}" y="112" text-anchor="middle" dominant-baseline="central" font-family="Montserrat, sans-serif" font-weight="800" font-size="${fs}" fill="url(#unt21)" filter="url(#ungl21)" letter-spacing="-.5">${esc(txt)}</text>
+    <text x="${40 + t / 2}" y="152" text-anchor="middle" dominant-baseline="central" font-family="Montserrat, sans-serif" font-weight="600" font-size="12" fill="#b9c2ff" letter-spacing="4">TO TAX DAY AND BEYOND</text>`);
+};
+SCENE.universe = `<svg viewBox="0 0 520 90" preserveAspectRatio="xMaxYMax meet"><rect x="170" y="4" width="346" height="82" rx="18" fill="#1c1150"/>${[...Array(30)].map((_, i) => `<circle cx="${180 + (i * 53) % 330}" cy="${10 + (i * 29) % 70}" r="${.6 + (i % 3) * .5}" fill="#fff"/>`).join('')}${planet21(440, 44, 20, '#ffd59e', '#e0884a', true)}${planet21(250, 60, 10, '#9fe8ff', '#3a6fd8')}${rocket21(340, 40, .8)}</svg>`;
+TICON.universe = '<svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="11" ry="3.4" fill="none" stroke="#e0a75e" stroke-width="1.6" transform="rotate(-18 12 12)"/><circle cx="12" cy="12" r="6" fill="#7b4ee0"/><circle cx="10" cy="10" r="2" fill="#d7b8ff"/></svg>';
+PARTS.universe = () => [`<svg viewBox="-12 -12 24 24">${S4(0, 0, 1, '#9fe8ff')}</svg>`, `<svg viewBox="-12 -12 24 24">${S4(0, 0, .8, '#d7b8ff')}</svg>`, '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="#ffd59e"/></svg>'];
+
+// ---------- Universe v21.5 (ma mị: tinh vân turbulence, lỗ đen, hành tinh khí khổng lồ có vành, hành tinh đỏ, trái đất + mặt trăng) ----------
+const UDEF = (W, H) => `<linearGradient id="u5bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#05061a"/><stop offset=".55" stop-color="#120a33"/><stop offset="1" stop-color="#25083d"/></linearGradient>
+  <filter id="u5neb" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".008 .014" numOctaves="5" seed="8"/><feColorMatrix type="matrix" values="0 0 0 0 .78  0 0 0 0 .22  0 0 0 0 .95  0 0 0 2.6 -1.25"/><feGaussianBlur stdDeviation="2"/></filter>
+  <filter id="u5neb2" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".011 .007" numOctaves="4" seed="21"/><feColorMatrix type="matrix" values="0 0 0 0 .18  0 0 0 0 .78  0 0 0 0 1  0 0 0 2.4 -1.3"/><feGaussianBlur stdDeviation="2"/></filter>
+  <filter id="u5glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <filter id="u5soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="10"/></filter>
+  <linearGradient id="u5band" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6d7a8"/><stop offset=".12" stop-color="#d99b5b"/><stop offset=".22" stop-color="#f3c98e"/><stop offset=".34" stop-color="#b8743f"/><stop offset=".45" stop-color="#eab57c"/><stop offset=".56" stop-color="#c98550"/><stop offset=".63" stop-color="#f7dcb3"/><stop offset=".75" stop-color="#a9653a"/><stop offset=".86" stop-color="#e2a86d"/><stop offset="1" stop-color="#8e4f2c"/></linearGradient>
+  <radialGradient id="u5shade" cx=".3" cy=".28" r=".85"><stop offset="0" stop-color="#fff" stop-opacity=".25"/><stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#05061a" stop-opacity=".85"/></radialGradient>
+  <linearGradient id="u5ring" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e9d2ff" stop-opacity="0"/><stop offset=".2" stop-color="#f6e3c6"/><stop offset=".5" stop-color="#fff4dc"/><stop offset=".8" stop-color="#c9a6ff"/><stop offset="1" stop-color="#e9d2ff" stop-opacity="0"/></linearGradient>
+  <radialGradient id="u5mars" cx=".35" cy=".3"><stop offset="0" stop-color="#ffb08a"/><stop offset=".6" stop-color="#d4532e"/><stop offset="1" stop-color="#5e1a14"/></radialGradient>
+  <radialGradient id="u5earth" cx=".35" cy=".3"><stop offset="0" stop-color="#9fe8ff"/><stop offset=".55" stop-color="#2f7fd6"/><stop offset="1" stop-color="#0b2257"/></radialGradient>
+  <radialGradient id="u5disk"><stop offset=".42" stop-color="#000" stop-opacity="0"/><stop offset=".5" stop-color="#fff1c9"/><stop offset=".62" stop-color="#ff9f43"/><stop offset=".8" stop-color="#c2185b" stop-opacity=".55"/><stop offset="1" stop-color="#7b1fa2" stop-opacity="0"/></radialGradient>
+  <linearGradient id="u5txt" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffffff"/><stop offset=".45" stop-color="#bff3ff"/><stop offset=".75" stop-color="#e3c4ff"/><stop offset="1" stop-color="#ffc6ea"/></linearGradient>
+  <linearGradient id="u5sh" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#9fe8ff" stop-opacity="0"/></linearGradient>
+  <clipPath id="u5clip"><rect x="4" y="4" width="${W - 8}" height="${H - 8}" rx="30"/></clipPath><clipPath id="u5gc"><circle r="54"/></clipPath>
+  <clipPath id="u5back"><rect x="-200" y="-200" width="400" height="200"/></clipPath><clipPath id="u5front"><rect x="-200" y="0" width="400" height="200"/></clipPath>`;
+const ustars = (W, H, n, seed) => { const r = rnd(seed); let s = ''; for (let i = 0; i < n; i++) { const big = i % 17 === 0; const x = (r() * W).toFixed(0), y = (r() * H).toFixed(0);
+  s += big ? `<g class="tw21" style="animation-delay:-${(r() * 3).toFixed(1)}s"><circle cx="${x}" cy="${y}" r="1.8" fill="#fff" filter="url(#u5glow)"/><path d="M${x} ${y - 7} V${+y + 7} M${x - 7} ${y} H${+x + 7}" stroke="#fff" stroke-width=".6" opacity=".8"/></g>`
+    : `<circle class="${i % 5 ? '' : 'tw21'}" style="animation-delay:-${(r() * 3).toFixed(1)}s" cx="${x}" cy="${y}" r="${(r() * 1.1 + .25).toFixed(2)}" fill="${['#fff', '#cfe9ff', '#ffe0f5', '#fff'][i % 4]}" opacity="${(.35 + r() * .65).toFixed(2)}"/>`; } return s; };
+const gasGiant = (x, y, s = 1) => `<g transform="translate(${x} ${y}) scale(${s})">
+  <g transform="rotate(-16)"><ellipse rx="112" ry="26" fill="none" stroke="url(#u5ring)" stroke-width="13" opacity=".9" clip-path="url(#u5back)"/><ellipse rx="96" ry="21" fill="none" stroke="#fff3da" stroke-width="2" opacity=".5" clip-path="url(#u5back)"/></g>
+  <circle r="62" fill="#ffb86b" opacity=".35" filter="url(#u5soft)"/>
+  <g clip-path="url(#u5gc)"><rect x="-60" y="-60" width="120" height="120" fill="url(#u5band)" transform="rotate(-16)"/><ellipse cx="18" cy="16" rx="13" ry="7" fill="#b3542e" opacity=".85" transform="rotate(-16)"/><ellipse cx="18" cy="16" rx="7" ry="3.5" fill="#e2875a" transform="rotate(-16)"/><circle r="54" fill="url(#u5shade)"/></g>
+  <circle r="54" fill="none" stroke="#ffe3bd" stroke-width="1.5" opacity=".6"/>
+  <g transform="rotate(-16)"><ellipse rx="112" ry="26" fill="none" stroke="url(#u5ring)" stroke-width="13" opacity=".95" clip-path="url(#u5front)"/><ellipse rx="96" ry="21" fill="none" stroke="#fff3da" stroke-width="2" opacity=".6" clip-path="url(#u5front)"/><ellipse rx="124" ry="29" fill="none" stroke="#d9b8ff" stroke-width="1.2" opacity=".5" clip-path="url(#u5front)"/></g></g>`;
+const blackHole = (x, y, s = 1) => `<g transform="translate(${x} ${y}) scale(${s})"><circle r="70" fill="url(#u5disk)" opacity=".55" filter="url(#u5soft)"/>
+  <g class="spin21"><ellipse rx="64" ry="14" fill="none" stroke="#ffcf7a" stroke-width="6" opacity=".9" filter="url(#u5glow)"/><ellipse rx="52" ry="10" fill="none" stroke="#fff6dc" stroke-width="2" opacity=".9"/></g>
+  <path d="M-30 -2 A30 30 0 0 1 30 -2" fill="none" stroke="#ffcf7a" stroke-width="5" opacity=".85" filter="url(#u5glow)"/><circle r="24" fill="#000"/><circle r="25" fill="none" stroke="#ffe7b3" stroke-width="1.6" opacity=".9"/>
+  <path d="M-64 2 A64 14 0 0 0 64 2" fill="none" stroke="#ffd98f" stroke-width="5" opacity=".95" filter="url(#u5glow)"/></g>`;
+const mars = (x, y, r) => `<g transform="translate(${x} ${y})"><circle r="${r + 6}" fill="#ff7b54" opacity=".25" filter="url(#u5soft)"/><circle r="${r}" fill="url(#u5mars)"/><circle cx="${-r * .3}" cy="${r * .1}" r="${r * .16}" fill="#8e2c1d" opacity=".55"/><circle cx="${r * .25}" cy="${-r * .3}" r="${r * .1}" fill="#8e2c1d" opacity=".5"/><circle cx="${r * .2}" cy="${r * .4}" r="${r * .08}" fill="#8e2c1d" opacity=".45"/></g>`;
+const earth = (x, y, r) => `<g transform="translate(${x} ${y})"><circle r="${r + 5}" fill="#5ec8ff" opacity=".35" filter="url(#u5soft)"/><circle r="${r}" fill="url(#u5earth)"/><path d="M${-r * .5} ${-r * .3} q${r * .3} ${-r * .3} ${r * .6} 0 q${-r * .1} ${r * .4} ${-r * .6} 0Z M${r * .1} ${r * .2} q${r * .3} 0 ${r * .45} ${r * .3} q${-r * .4} ${r * .1} ${-r * .45} ${-r * .3}Z" fill="#5fc27a" opacity=".85"/><path d="M${-r * .8} ${r * .1} q${r * .8} ${-r * .3} ${r * 1.5} 0" stroke="#fff" stroke-width="${r * .12}" fill="none" opacity=".55" stroke-linecap="round"/><circle r="${r}" fill="none" stroke="#bff3ff" stroke-width="1.2" opacity=".7"/>
+  <g class="orb21"><circle cx="${r * 1.9}" cy="0" r="${r * .27}" fill="#d9dde6"/></g></g>`;
+HELLO.universe = (txt) => {
+  const fs = 46, t = tw21(txt, `800 ${fs}px Montserrat, sans-serif`), W = Math.round(t + 400), H = 300, tx = 44 + t / 2;
+  return svgS(W, H, `<defs>${UDEF(W, H)}</defs><g clip-path="url(#u5clip)">
+      <rect width="${W}" height="${H}" fill="url(#u5bg)"/>
+      <rect width="${W}" height="${H}" filter="url(#u5neb)" opacity=".75"/><rect width="${W}" height="${H}" filter="url(#u5neb2)" opacity=".55"/>
+      <ellipse cx="${W * .3}" cy="${H * .85}" rx="${W * .4}" ry="90" fill="#ff3fa4" opacity=".18" filter="url(#u5soft)"/><ellipse cx="${W * .72}" cy="${H * .2}" rx="220" ry="110" fill="#38d6ff" opacity=".12" filter="url(#u5soft)"/>
+      ${ustars(W, H, 170, 11)}
+      ${blackHole(W * .44, H * .8, .85)}
+      ${mars(56, 60, 15)}
+      <g class="bob21" style="animation-duration:7s">${gasGiant(W - 150, 120, 1)}</g>
+      ${earth(W - 44, H - 52, 20)}
+      <g class="shoot21"><path d="M0 0 L-90 -28" stroke="url(#u5sh)" stroke-width="2.6" stroke-linecap="round"/><circle r="2.8" fill="#fff" filter="url(#u5glow)"/></g>
+      <g class="fly21" style="animation-duration:16s">${rocket21(0, 0, .9)}</g></g>
+    <rect x="4" y="4" width="${W - 8}" height="${H - 8}" rx="30" fill="none" stroke="#7b4ee0" stroke-width="1.5" opacity=".6"/>
+    <text x="${tx}" y="118" text-anchor="middle" dominant-baseline="central" font-family="Montserrat, sans-serif" font-weight="800" font-size="${fs}" fill="#bff3ff" opacity=".55" filter="url(#u5soft)">${esc(txt)}</text>
+    <text x="${tx}" y="118" text-anchor="middle" dominant-baseline="central" font-family="Montserrat, sans-serif" font-weight="800" font-size="${fs}" fill="url(#u5txt)" letter-spacing="-.5">${esc(txt)}</text>
+    <text x="${tx}" y="160" text-anchor="middle" dominant-baseline="central" font-family="Montserrat, sans-serif" font-weight="600" font-size="12" fill="#c9c2ff" letter-spacing="5">TO TAX DAY AND BEYOND</text>`);
+};
+SCENE.universe = `<svg viewBox="0 0 520 90" preserveAspectRatio="xMaxYMax meet"><defs>${UDEF(520, 90).replace('<clipPath id="u5clip"><rect x="4" y="4" width="512" height="82" rx="30"/></clipPath>', '')}</defs><rect x="150" y="2" width="366" height="86" rx="16" fill="url(#u5bg)"/><rect x="150" y="2" width="366" height="86" rx="16" filter="url(#u5neb)" opacity=".7"/>${[...Array(40)].map((_, i) => `<circle cx="${160 + (i * 53) % 350}" cy="${8 + (i * 29) % 76}" r="${.5 + (i % 3) * .45}" fill="#fff"/>`).join('')}<g transform="translate(445 46) scale(.42)">${gasGiant(0, 0, 1)}</g>${blackHole(260, 60, .3)}</svg>`;
+
+// ---------- menu bands for groovy / zodiac / math / universe ----------
+const _band214 = band20;
+band20 = function (k) {
+  _band214(k); const mb = $('.menubar'); if (!mb || !['groovy', 'zodiac', 'math', 'universe'].includes(k)) return;
+  const b = document.createElement('div'); b.className = 'band20 b-' + k; b.setAttribute('aria-hidden', 'true'); const r = rnd(5); let h = '';
+  if (k === 'groovy') h = '<div class="gv21"></div>';
+  if (k === 'zodiac') { const g = Object.values(ZOD21).map((z) => z[0]); for (let i = 0; i < 40; i++) h += `<span class="tw21b" style="left:${(i / 40 * 100 + r() * 1.5).toFixed(1)}%;top:${(3 + r() * 20).toFixed(0)}px;animation-delay:-${(r() * 3).toFixed(1)}s;color:${i % 4 ? '#fff6d8' : '#e8c46a'};font-size:${i % 4 ? 6 + r() * 4 : 13}px">${i % 4 ? '●' : g[i % 12] + '︎'}</span>`; h += '<span class="shb21"></span>'; }
+  if (k === 'math') { const eq = ['π ≈ 3.14159', 'a² + b² = c²', '∑ refunds', 'e^iπ + 1 = 0', '1040 ✓', '√144 = 12', '∞ coffee', 'Δ = b² − 4ac', 'W-2 + 1099', '7 × 8 = 56'];
+    h = `<div class="rul21"></div><div class="mq21m"><div class="mqin21m">${[...eq, ...eq].map((e) => `<span>${e}</span>`).join('')}</div></div>`; }
+  if (k === 'universe') { for (let i = 0; i < 46; i++) h += `<span class="tw21b" style="left:${(i / 46 * 100 + r() * 1.5).toFixed(1)}%;top:${(3 + r() * 24).toFixed(0)}px;animation-delay:-${(r() * 3).toFixed(1)}s;color:${i % 5 ? '#fff' : '#9fe8ff'};font-size:${4 + r() * 5}px">●</span>`;
+    h += `<span class="pl21b" style="left:18%"><svg viewBox="-30 -20 60 40" width="34">${planet21(0, 0, 9, '#ffd59e', '#e0884a', true)}</svg></span><span class="pl21b" style="left:71%;top:4px"><svg viewBox="-12 -12 24 24" width="14">${planet21(0, 0, 8, '#9fe8ff', '#3a6fd8')}</svg></span><span class="rk21"><svg viewBox="-20 -30 40 60" width="26">${rocket21(0, 0, .8)}</svg></span>`; }
+  b.innerHTML = h; mb.appendChild(b);
+};
+const _applyTheme214 = V19.applyTheme;
+V19.applyTheme = function () { _applyTheme214(); const k = THEME; if (['groovy', 'zodiac', 'math', 'universe'].includes(k) && $('.menubar') && !$('.menubar .band20')) band20(k); };
+
+// ---------- theme picker: theme + cung hoàng đạo (v21.6: bỏ tab tên, món ăn vặt, tuổi) ----------
+openTheme = function () {
+  const m = $('#modalHost'); const pick = { theme: THEME, motion: MOTION, zodiac: (S.me && S.me.zodiac) || '' };
+  const draw = () => {
+    m.innerHTML = `<div class="modal"><div class="box th20 th21"><h3>Theme</h3>
+      <div class="pay19"><div class="thgrid">${THEMES.map(([k, n]) => `<button type="button" class="thcard th-${k} ${pick.theme === k ? 'on' : ''}" data-th="${k}"><span class="thprev">${SCENE[k] || ''}</span><b><span class="thic">${TICON[k]}</span>${n}</b></button>`).join('')}</div></div>
+      <h4>Cung hoàng đạo</h4><div class="zdg21">${Object.entries(ZOD21).map(([k, z]) => `<button type="button" class="${pick.zodiac === k ? 'on' : ''}" data-zd="${k}"><b>${z[0]}︎</b><span>${z[1]}</span><small>${z[2]}</small></button>`).join('')}</div>
+      <label class="small" style="display:flex;gap:6px;align-items:center;margin-top:12px"><input type="checkbox" id="th20m" ${pick.motion ? 'checked' : ''} style="width:auto"> Animation</label>
+      <div class="err" id="thErr"></div><div class="row-end"><button class="btn" id="thC">Hủy</button><button class="btn pri" id="thS">Lưu</button></div></div></div>`;
+    m.firstChild.onclick = (e) => { if (e.target === m.firstChild) { m.innerHTML = ''; return; } const b = e.target.closest('[data-th],[data-zd]'); if (!b) return;
+      if (b.dataset.th) pick.theme = b.dataset.th; if (b.dataset.zd) pick.zodiac = pick.zodiac === b.dataset.zd ? '' : b.dataset.zd;
+      const y = m.querySelector('.box').scrollTop; draw(); m.querySelector('.box').scrollTop = y; };
+    $('#th20m').onchange = (e) => { pick.motion = e.target.checked; };
+    $('#thC').onclick = () => { m.innerHTML = ''; };
+    $('#thS').onclick = function () { this.disabled = true;
+      api('PUT', '/prefs', { theme: pick.theme, zodiac: pick.zodiac }).then(() => {
+        Object.assign(S.me, { theme: pick.theme, zodiac: pick.zodiac }); MOTION = pick.motion; try { localStorage.setItem('tax_motion20', MOTION ? '1' : '0'); } catch (e) { /* ignore */ }
+        m.innerHTML = ''; setTheme(pick.theme); render(); toast('Đã lưu theme'); }).catch((e) => { this.disabled = false; $('#thErr').textContent = e.message; }); };
+  };
+  draw();
+};
+
+// ---------- v21.6: dải chạy dưới menu cho Cruising / Pro / Zodiac / Universe ----------
+const _band216 = band20;
+band20 = function (k) {
+  _band216(k); const mb = $('.menubar'); if (!mb) return;
+  if (k === 'cruise' || k === 'pro') {
+    const b = document.createElement('div'); b.className = 'band20 b-' + k; b.setAttribute('aria-hidden', 'true');
+    if (k === 'cruise') {
+      const sail = (c, w) => `<svg viewBox="0 0 40 34" width="${w}"><path d="M20 2 V26 M20 4 L34 24 H20Z" fill="${c}" stroke="#3f5a6e" stroke-width="1.2" stroke-linejoin="round"/><path d="M20 8 L9 24 H20Z" fill="#fff" stroke="#3f5a6e" stroke-width="1.2" stroke-linejoin="round"/><path d="M5 26 H36 L32 32 H9Z" fill="#3f5a6e"/></svg>`;
+      const ship = '<svg viewBox="0 0 60 30" width="54"><path d="M4 20 H56 L50 28 H10Z" fill="#3f5a6e"/><rect x="14" y="12" width="32" height="8" rx="1.5" fill="#f4f1ec" stroke="#8fa9b8"/><rect x="20" y="6" width="18" height="6" rx="1" fill="#f4f1ec" stroke="#8fa9b8"/><rect x="38" y="2" width="5" height="9" fill="#c9575b"/>' + [0, 1, 2, 3, 4].map((i) => `<circle cx="${18 + i * 6}" cy="16" r="1.3" fill="#8fa9b8"/>`).join('') + '</svg>';
+      const gull = '<svg viewBox="0 0 24 10" width="18"><path d="M1 7 q5 -6 11 0 q5 -6 11 0" stroke="#5b7d93" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>';
+      b.innerHTML = `<div class="flg6"></div><span class="sail6">${sail('#f4f1ec', 36)}</span><span class="sail6 s3" style="animation-delay:-14s">${sail('#f6d2b8', 28)}</span><span class="sail6 s2">${ship}</span><span class="gull6">${gull}</span><span class="gull6" style="animation-delay:-11s;top:22px">${gull}</span>`;
+    } else {
+      const T = taxDay20(); const items = [`<b>Tax day</b> ${mdy(T.d)}`, `<b>${T.n}</b> days to go`, '1040 · W-2 · 1099 · Schedule C', 'First Source Multi Agency', `<b>E-file</b> · <b>Refund</b> · <b>Accepted</b>`, 'Precision · Discretion · Service', 'Westminster, California'];
+      const one = items.map((x) => `<span>${x}</span><i>◆</i>`).join(''); b.innerHTML = `<div class="mq6"><div>${one}${one}${one}</div></div>`;
+    }
+    mb.appendChild(b); return;
+  }
+  const b = mb.querySelector('.band20.b-' + k); if (!b) return;
+  if (k === 'zodiac' && !b.querySelector('.ss6')) { // v21.7: sao băng liên tục + ký hiệu 12 cung bay lên lấp lánh
+    const g = Object.values(ZOD21).map((z) => z[0]); let h = '';
+    for (let i = 0; i < 6; i++) h += `<span class="ss6" style="left:${12 + i * 16}%;animation-delay:-${(i * 1.15).toFixed(2)}s;animation-duration:${(3.4 + (i % 3) * .6).toFixed(1)}s"></span>`;
+    for (let i = 0; i < 16; i++) h += `<span class="zg6" style="left:${(i * 6.3 + 2).toFixed(1)}%;animation-delay:-${(i * .55).toFixed(2)}s;animation-duration:${(4 + (i % 4) * .7).toFixed(1)}s">${g[i % 12]}︎</span>`;
+    b.insertAdjacentHTML('beforeend', h); }
+  if (k === 'universe' && !b.querySelector('.sf6')) b.insertAdjacentHTML('afterbegin', `<div class="sf6 a"></div><div class="sf6 b"></div><span class="pl6"><svg viewBox="-30 -20 60 40" width="40">${planet21(0, 0, 9, '#ffd59e', '#e0884a', true)}</svg></span><span class="pl6 p2"><svg viewBox="-12 -12 24 24" width="16">${planet21(0, 0, 8, '#9fe8ff', '#3a6fd8')}</svg></span>`);
+};
+const _applyTheme216 = V19.applyTheme;
+V19.applyTheme = function () { _applyTheme216(); const k = THEME; if ((k === 'cruise' || k === 'pro') && $('.menubar') && !$('.menubar .band20')) band20(k); };
 
 return { ti, hello: (txt) => (HELLO[THEME] || HELLO.autumn)(txt), setTheme: (k) => setTheme(k), openTheme: () => openTheme(), theme: () => THEME };
 })();

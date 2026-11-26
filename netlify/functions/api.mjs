@@ -1,4 +1,5 @@
 // tax.fsma.team - single API function. Every request goes to /api/...
+import * as HORO from '../lib/horo.mjs'; // v21.5
 import bcrypt from 'bcryptjs';
 import {
   db, json, HttpError, requireUser, requireAdmin, createSession, cookieHeader, env,
@@ -14,9 +15,9 @@ const METHODS = ['Cash', 'Check', 'Zelle', 'Venmo'];
 const COLORS = ['Rose', 'Blue', 'Sunshine', 'Green', 'Orange', 'Purple', 'Teal', 'Pink'];
 const FONTS = ['Pacifico', 'Lobster', 'Comfortaa', 'Montserrat', 'Nunito', 'Oswald', 'Gloria Hallelujah', 'Quicksand'];
 const APPT_FONTS = ['Default', 'Nunito', 'Quicksand', 'Montserrat', 'Comfortaa'];
-const THEMES = ['autumn', 'cruise', 'bloom', 'pro']; // v20: 4 themes
+const THEMES = ['autumn', 'cruise', 'bloom', 'pro', 'genz', 'groovy', 'zodiac', 'math', 'universe']; // v21.5 // v20: 4 themes · v21.2: + Gen Z, Đô thị
 const TAB_STYLES = ['pill', 'icon', 'bub', 'face', 'tag', 'dot'];
-const FOODS = ['boba', 'trabb', 'che', 'cavien', 'bovien', 'bttron', 'btcuon', 'bunbo', 'sbux', 'matcha', 'bacxiu'];
+const FOODS = ['boba', 'cafe', 'trasua', 'banhmi', 'oplate', 'xiumai', 'pate', 'bttron', 'vuheo', 'oc', 'lauthai', 'trabb', 'che', 'cavien', 'bovien', 'btcuon', 'bunbo', 'sbux', 'matcha', 'bacxiu']; // v21.3: món ăn vặt mới (giữ key cũ)
 const ZODIACS = ['aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo', 'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces'];
 const MOODS = ['😎', '☕', '🥱', '🤯', '🥳'];
 const CALS = ['Office', 'Daniel', 'Peter'];
@@ -168,6 +169,8 @@ function ensureSchema() {
     const t20 = await sql`select table_name from information_schema.tables where table_schema = current_schema() and table_name in ('pr_businesses','pr_audit','news_items','news_feeds')`;
     const ok20 = c20.some((r) => r.table_name === 'users') && c20.some((r) => r.table_name === 'pay_rows') && t20.length === 4;
     if (!ok20) { console.log('schema: adding v20 tables'); await sql.unsafe(SCHEMA_V20); }
+    // v21.5: Quick reading cache
+    await sql.unsafe(`create table if not exists horoscopes (sign text not null, day date not null, text text not null default '', url text, fetched_at timestamptz not null default now(), primary key (sign, day)); alter table horoscopes enable row level security;`); // v21.5
     // v21: report mode table (the one-time ticks are in sql/12-v21.sql)
     await sql.unsafe(`create table if not exists pr_rep_mode (business_id int not null references pr_businesses(id) on delete cascade, year int not null,
       q smallint not null check (q between 1 and 4), mode char(1) not null check (mode in ('M','Q')), primary key (business_id, year, q));
@@ -1195,6 +1198,7 @@ const routes = [
   ['PUT', '/pay/rows', async (x) => { requireAdmin(x.user); return putPayRow(x.body); }],
   ['GET', '/log', async (x) => { requireAdmin(x.user); return listLog(); }],
   // v20: news (everyone reads, Admin pulls / hides)
+  ['GET', '/horoscope', (x) => HORO.getReading(String(x.url.searchParams.get('sign') || ''))], // v21.5 Quick reading
   ['GET', '/news', (x) => getNews(x.url.searchParams.get('feed') === 'payroll' ? 'payroll' : 'tax', x.user.role === 'admin' && x.url.searchParams.get('all') === '1')],
   ['POST', '/news/pull', async (x) => { requireAdmin(x.user); const f = x.body.feed === 'payroll' ? 'payroll' : 'tax'; return pullFeed(f); }],
   ['PATCH', '/news/:id', async (x) => { requireAdmin(x.user); await db()`update news_items set hidden=${bool(x.body.hidden)} where id=${x.id}`; return { ok: true }; }],
