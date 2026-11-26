@@ -1122,5 +1122,45 @@ band20 = function (k) {
 const _applyTheme216 = V19.applyTheme;
 V19.applyTheme = function () { _applyTheme216(); const k = THEME; if ((k === 'cruise' || k === 'pro') && $('.menubar') && !$('.menubar .band20')) band20(k); };
 
+
+// =====================================================================
+// v22: theme Gen-Z (Aura) thay Gen-Z 1 + Gen-Z 2 cũ
+// =====================================================================
+const F22 = { b: "'Bricolage Grotesque', 'Segoe UI', sans-serif" };
+const tw22 = (txt, font, min = 150) => { _cv.font = font; return Math.max(_cv.measureText(txt).width, min); };
+const sgn22 = () => { const z = S.me && S.me.zodiac; return z && ZOD21[z] ? z : 'leo'; };
+// ---------- Gen-Z · Aura ----------
+HELLO.gzaura = (txt) => {
+  const T = txt.toLowerCase(), fs = 50, t = tw22(T, `800 ${fs}px ${F22.b}`), W = Math.round(Math.max(t + 230, 470)), H = 270, z = sgn22();
+  const orb = (cx, cy, r, c, cls, d) => `<g class="orb22 ${cls}" style="animation-delay:${d}s"><circle cx="${cx}" cy="${cy}" r="${r}" fill="${c}"/></g>`;
+  const chip = (x, y, s, rot) => { const w = tw22(s, `700 13px ${F22.b}`, 20) + 26; return `<g transform="translate(${x} ${y}) rotate(${rot})"><rect width="${w}" height="28" rx="14" fill="#fff" fill-opacity=".62" stroke="#fff"/><text x="${w / 2}" y="15" text-anchor="middle" dominant-baseline="central" font-family="${F22.b}" font-weight="700" font-size="13" fill="#3b2b66">${s}</text></g>`; };
+  return svgS(W, H, `<defs><filter id="au22b" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="34"/></filter><filter id="au22n"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 .2  0 0 0 0 .15  0 0 0 0 .3  0 0 0 .55 0"/></filter><clipPath id="au22c"><rect x="4" y="4" width="${W - 8}" height="${H - 8}" rx="32"/></clipPath></defs>
+    <g clip-path="url(#au22c)"><rect width="${W}" height="${H}" fill="#f6f1ff"/><g filter="url(#au22b)">
+      ${orb(W * .18, 70, 90, '#ffa3d7', 'a', 0)}${orb(W * .55, 210, 110, '#b79bff', 'b', -3)}${orb(W * .86, 60, 95, '#8fe3ff', 'c', -6)}${orb(W * .78, 230, 80, '#ffd08a', 'a', -9)}${orb(W * .36, 140, 60, '#ffffff', 'b', -4)}</g>
+      <rect width="${W}" height="${H}" filter="url(#au22n)" opacity=".35"/></g>
+    <rect x="4" y="4" width="${W - 8}" height="${H - 8}" rx="32" fill="none" stroke="#fff" stroke-opacity=".8" stroke-width="2"/>
+    <text x="36" y="58" font-family="${F22.b}" font-weight="700" font-size="13" fill="#3b2b66" letter-spacing="2.5" opacity=".75">AURA CHECK ✦ ${z.toUpperCase()} ${ZOD21[z][0]}︎ ENERGY</text>
+    <text x="34" y="${H / 2 + 4}" dominant-baseline="central" font-family="${F22.b}" font-weight="800" font-size="${fs}" fill="#24184a" letter-spacing="-2">${esc(T)}</text>
+    ${chip(36, H - 74, 'protect your peace', -3)}${chip(200, H - 64, 'refund era', 4)}${chip(W - 150, 42, 'soft life ✦', 6)}
+    ${S4(W - 60, H - 60, 1.1, '#fff', 'tw21')}${S4(W - 96, H - 40, .6, '#fff', 'tw21')}${S4(W * .5, 46, .7, '#fff', 'tw21')}`);
+};
+SCENE.gzaura = `<svg viewBox="0 0 520 90" preserveAspectRatio="xMaxYMax meet"><defs><filter id="au22p" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="14"/></filter></defs><g filter="url(#au22p)"><circle cx="260" cy="40" r="40" fill="#ffa3d7"/><circle cx="360" cy="60" r="44" fill="#b79bff"/><circle cx="460" cy="30" r="40" fill="#8fe3ff"/><circle cx="420" cy="80" r="30" fill="#ffd08a"/></g><text x="370" y="48" text-anchor="middle" dominant-baseline="central" font-family="${F22.b}" font-weight="800" font-size="30" fill="#24184a" letter-spacing="-1">hello bestie</text></svg>`;
+TICON.gzaura = `<svg viewBox="0 0 24 24"><defs><radialGradient id="au22i"><stop offset="0" stop-color="#fff"/><stop offset=".45" stop-color="#ffa3d7"/><stop offset="1" stop-color="#8fe3ff"/></radialGradient></defs><circle cx="12" cy="12" r="10" fill="url(#au22i)"/></svg>`;
+PARTS.gzaura = () => [`<svg viewBox="-12 -12 24 24"><path d="M0 -12 C1 -4 4 -1 12 0 C4 1 1 4 0 12 C-1 4 -4 1 -12 0 C-4 -1 -1 -4 0 -12Z" fill="#c9b5ff"/></svg>`, `<svg viewBox="-12 -12 24 24"><path d="M0 -12 C1 -4 4 -1 12 0 C4 1 1 4 0 12 C-1 4 -4 1 -12 0 C-4 -1 -1 -4 0 -12Z" fill="#ffb3d9"/></svg>`, '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="#a9e9ff" opacity=".8"/></svg>'];
+
+// ---------- dải chạy dưới menu ----------
+const _band22 = band20;
+band20 = function (k) {
+  _band22(k); const mb = $('.menubar'); if (!mb || k !== 'gzaura') return;
+  const b = document.createElement('div'); b.className = 'band20 b-' + k; b.setAttribute('aria-hidden', 'true');
+  const one = ['manifesting refunds', 'protect your peace', 'soft life', 'main character', 'no stress era', 'good vibes only'].map((x) => `<span>${x}</span><i>✦</i>`).join('');
+  b.innerHTML = `<div class="mq22"><div>${one}${one}</div></div>`; mb.appendChild(b);
+};
+const _applyTheme22 = V19.applyTheme;
+V19.applyTheme = function () { _applyTheme22(); if (THEME === 'gzaura' && $('.menubar') && !$('.menubar .band20')) band20(THEME); };
+// danh sách theme v22: bỏ Gen-Z 1 (genz) + Gen-Z 2 (groovy), thêm Gen-Z (Aura)
+THEMES.length = 0;
+[['autumn', 'Mùa thu'], ['cruise', 'Cruising'], ['bloom', 'Flowers'], ['pro', 'Professional'], ['gzaura', 'Gen-Z'], ['zodiac', 'Zodiac'], ['math', 'Thần đồng toán học'], ['universe', 'Universe']].forEach((t) => THEMES.push(t));
+
 return { ti, hello: (txt) => (HELLO[THEME] || HELLO.autumn)(txt), setTheme: (k) => setTheme(k), openTheme: () => openTheme(), theme: () => THEME };
 })();

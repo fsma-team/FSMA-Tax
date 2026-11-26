@@ -1,0 +1,34 @@
+/* ===================== v22: theme Gen-Z (Aura) ===================== */
+.hscene .orb22{ animation: orb22 14s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: center; }
+.hscene .orb22.b{ animation-duration: 17s; } .hscene .orb22.c{ animation-duration: 12s; }
+@keyframes orb22{ 0%{ transform: translate(0, 0) scale(1); } 50%{ transform: translate(40px, -24px) scale(1.15); } 100%{ transform: translate(-30px, 20px) scale(.9); } }
+body.nomo20 .orb22, body.nomo20 .mq22 > div, body.nomo20 .band20.b-gzaura{ animation: none !important; }
+
+/* band chung */
+.band20 .mq22{ position: absolute; inset: 0; overflow: hidden; display: flex; align-items: center; }
+.band20 .mq22 > div{ display: inline-flex; align-items: center; gap: 16px; white-space: nowrap; animation: mq21 40s linear infinite; padding-left: 16px; }
+.band20 .mq22 i{ width: 15px; height: 15px; display: inline-flex; font-style: normal; align-items: center; justify-content: center; } .band20 .mq22 i svg{ width: 100%; height: 100%; display: block; }
+
+/* ---------- Gen-Z · Aura ---------- */
+body[data-style=gzaura]{ --t1:#8a6cff; --t2:#f5f0ff; --t3:#e0d5ff; --tink:#24184a; --pg:#fbf9ff; --link:#7a55f0; --cloud-ink:#7a55f0;
+  background: #fbf9ff radial-gradient(900px 400px at 0% 0%, rgba(255,163,215,.22), transparent 70%), radial-gradient(900px 500px at 100% 10%, rgba(143,227,255,.22), transparent 70%) fixed !important; }
+body[data-style=gzaura] .menubar{ background: rgba(255,255,255,.72) !important; border-bottom: 1px solid rgba(180,160,255,.25) !important; padding-bottom: 30px !important; backdrop-filter: blur(14px); }
+body[data-style=gzaura] .band20.b-gzaura{ height: 28px; background: linear-gradient(90deg, #ffb3d9, #c9b5ff, #a9e9ff, #ffd6a5, #ffb3d9) 0 0 / 300% 100%; animation: au22 12s linear infinite; }
+@keyframes au22{ to{ background-position: 300% 0; } }
+body[data-style=gzaura] .mq22 span{ font: 700 12.5px 'Bricolage Grotesque', sans-serif; color: #24184a; letter-spacing: .3px; } body[data-style=gzaura] .mq22 i{ color: #fff; font-size: 13px; }
+body[data-style=gzaura] .nav button{ border-radius: 999px !important; padding: 6px 15px !important; margin: 6px 2px; color: #24184a !important; font-weight: 600; text-transform: none; border: 0 !important; }
+body[data-style=gzaura] .nav button.on{ background: linear-gradient(120deg, #ffa3d7, #b79bff 55%, #8fe3ff) !important; color: #24184a !important; box-shadow: 0 6px 18px rgba(183,155,255,.35); }
+body[data-style=gzaura] h1, body[data-style=gzaura] .page-head h1, body[data-style=gzaura] .pay19 h1, body[data-style=gzaura] h2.fhh{ font-family: 'Bricolage Grotesque', sans-serif !important; font-weight: 800 !important; color: #24184a !important; letter-spacing: -1px; text-transform: lowercase !important; }
+body[data-style=gzaura] .ts-tag .st20:not(.add){ background: rgba(255,255,255,.7) !important; color: #24184a !important; border: 1px solid #fff !important; border-radius: 999px !important; font-weight: 700; box-shadow: 0 4px 14px color-mix(in srgb, var(--c) 30%, transparent); backdrop-filter: blur(8px); }
+body[data-style=gzaura] .ts-tag .thole{ background: radial-gradient(circle at 35% 30%, #fff, var(--c) 70%); box-shadow: 0 0 8px var(--c); }
+body[data-style=gzaura] .ts-tag .st20:not(.add):hover, body[data-style=gzaura] .ts-tag .st20.on{ background: linear-gradient(120deg, color-mix(in srgb, var(--c) 35%, #fff), #fff) !important; }
+body[data-style=gzaura] .btn.primary, body[data-style=gzaura] .btn.pri{ background: linear-gradient(120deg, #ff8cc8, #a07dff); border: 0; color: #fff; border-radius: 999px; }
+body[data-style=gzaura] .stab21 .banner.b21{ background: linear-gradient(110deg, #fff 30%, #fbefff 60%, #eaf9ff) !important; border-color: #eee6ff !important; border-radius: 24px; }
+
+/* bảng + ngày hôm nay */
+body[data-style=gzaura] .stab21 table.sheet th{ background: #24184a !important; color: #fff !important; border-bottom: 3px solid #c9b5ff !important; }
+body[data-style=gzaura] .appt21 .week.w19 th.today21 .dd21{ background: linear-gradient(120deg, #ff8cc8, #a07dff); color: #fff; }
+body[data-style=gzaura] .appt21 .abar21 > .btn.on{ border-bottom-color: #a07dff; }
+body[data-style=gzaura] .pay19 .card-head h2, body[data-style=gzaura] .pay19 .bd-h, body[data-style=gzaura] .pay19 .fyh h2{ color: #24184a !important; }
+body[data-style=gzaura] #sheets a.sub19.on{ background: linear-gradient(120deg, #ffa3d7, #b79bff 55%, #8fe3ff); color: #24184a; border-radius: 999px; }
+body[data-style=gzaura] .rd21{ background: linear-gradient(160deg, #fff 50%, #fbefff 80%, #eaf9ff); }

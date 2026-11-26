@@ -15,7 +15,7 @@ const METHODS = ['Cash', 'Check', 'Zelle', 'Venmo'];
 const COLORS = ['Rose', 'Blue', 'Sunshine', 'Green', 'Orange', 'Purple', 'Teal', 'Pink'];
 const FONTS = ['Pacifico', 'Lobster', 'Comfortaa', 'Montserrat', 'Nunito', 'Oswald', 'Gloria Hallelujah', 'Quicksand'];
 const APPT_FONTS = ['Default', 'Nunito', 'Quicksand', 'Montserrat', 'Comfortaa'];
-const THEMES = ['autumn', 'cruise', 'bloom', 'pro', 'genz', 'groovy', 'zodiac', 'math', 'universe']; // v21.5 // v20: 4 themes · v21.2: + Gen Z, Đô thị
+const THEMES = ['autumn', 'cruise', 'bloom', 'pro', 'gzaura', 'zodiac', 'math', 'universe']; // v22: Gen-Z (Aura) thay genz + groovy · v21.5 // v20: 4 themes · v21.2: + Gen Z, Đô thị
 const TAB_STYLES = ['pill', 'icon', 'bub', 'face', 'tag', 'dot'];
 const FOODS = ['boba', 'cafe', 'trasua', 'banhmi', 'oplate', 'xiumai', 'pate', 'bttron', 'vuheo', 'oc', 'lauthai', 'trabb', 'che', 'cavien', 'bovien', 'btcuon', 'bunbo', 'sbux', 'matcha', 'bacxiu']; // v21.3: món ăn vặt mới (giữ key cũ)
 const ZODIACS = ['aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo', 'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces'];
@@ -227,7 +227,7 @@ async function health() {
   return json(out);
 }
 
-const meOut = (u) => ({ id: u.id, username: u.username, full_name: u.full_name, display_name: u.display_name, role: u.role, tab_id: u.tab_id, must_change: u.must_change, appt_font: u.appt_font, theme: THEMES.includes(u.theme) ? u.theme : 'autumn', food: u.food || '', zodiac: u.zodiac || '', tab_styles: u.tab_styles || {} });
+const meOut = (u) => ({ id: u.id, username: u.username, full_name: u.full_name, display_name: u.display_name, role: u.role, tab_id: u.tab_id, must_change: u.must_change, appt_font: u.appt_font, theme: THEMES.includes(u.theme) ? u.theme : (['genz', 'groovy'].includes(u.theme) ? 'gzaura' : 'autumn'), food: u.food || '', zodiac: u.zodiac || '', tab_styles: u.tab_styles || {} });
 
 async function changePassword(user, body) {
   const sql = db();
